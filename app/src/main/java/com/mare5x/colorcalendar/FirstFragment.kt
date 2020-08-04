@@ -1,6 +1,7 @@
 package com.mare5x.colorcalendar
 
 import android.os.Bundle
+import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
@@ -27,5 +28,8 @@ class FirstFragment : Fragment() {
         view.findViewById<Button>(R.id.button_first).setOnClickListener {
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
+
+        val grid: ColorGrid = view.findViewById(R.id.colorGrid)
+        grid.itemClickedListener = { Log.i("yxcv", "onViewCreated: $it")}
     }
 }
