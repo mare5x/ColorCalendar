@@ -1,5 +1,6 @@
 package com.mare5x.colorcalendar
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
@@ -9,10 +10,9 @@ import android.view.ViewGroup
 import android.widget.Button
 import androidx.navigation.fragment.findNavController
 
-/**
- * A simple [Fragment] subclass as the default destination in the navigation.
- */
-class FirstFragment : Fragment() {
+class ColorGridFragment : Fragment() {
+    private var grid: ColorGrid? = null
+    private lateinit var adapter: ColorRectAdapter
 
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?,
@@ -29,7 +29,13 @@ class FirstFragment : Fragment() {
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
 
-        val grid: ColorGrid = view.findViewById(R.id.colorGrid)
-        grid.itemClickedListener = { Log.i("yxcv", "onViewCreated: $it")}
+        grid = view.findViewById(R.id.colorGrid) as ColorGrid?
+        grid!!.itemClickedListener = { Log.i("yxcv", "onViewCreated: $it")}
+        grid!!.adapter = this.adapter
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        adapter = ColorRectAdapter(context, DatabaseHelper(context))
     }
 }
