@@ -20,7 +20,7 @@ private object DatabaseContract {
     const val DB_VERSION = 1
 
     @SuppressLint("SimpleDateFormat")
-    val DATE_FORMAT = SimpleDateFormat("YYYY-MM-DD HH:MM:SS.SSS")  // ISO8601
+    val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")  // ISO8601
 
     object ProfileEntryDB : BaseColumns {
         const val TABLE_NAME = "profile"
@@ -40,15 +40,16 @@ private object DatabaseContract {
 
     object EntryDB : BaseColumns {
         const val TABLE_NAME = "entry"
-        const val DATE = "date"
+        const val DATE = "_date"
         const val VALUE = "value"
         const val PROFILE_FK = "profile_id"
 
         const val DB_CREATE = """
-            CREATE TABLE ${TABLE_NAME}(
+            CREATE TABLE $TABLE_NAME(
                 ${BaseColumns._ID} INTEGER PRIMARY KEY,
+                $PROFILE_FK INTEGER NOT NULL,
                 $DATE TEXT,
-                $VALUE REAL NOT NULL
+                $VALUE REAL NOT NULL,
                 
                 FOREIGN KEY (${PROFILE_FK}) REFERENCES ${ProfileEntryDB.TABLE_NAME} (${BaseColumns._ID})
             );
@@ -59,7 +60,7 @@ private object DatabaseContract {
 
 data class ProfileEntry(var id: Int = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0)
 
-data class Entry(var id: Int = -1, var profile: ProfileEntry, var date: Date, var value: Float)
+data class Entry(var id: Int = -1, var profile: ProfileEntry? = null, var date: Date? = null, var value: Float = 0f)
 
 
 class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
@@ -70,14 +71,17 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
     // TODO execute database commands in a coroutine
     init {
-        Log.i(TAG, queryProfile(1).toString())
+        insertProfile(ProfileEntry(name="default", minColor=Color.RED, maxColor=Color.GREEN))
+        val profile = queryProfile(1)
+        val id = insertEntry(Entry(profile=profile, date=DatabaseContract.DATE_FORMAT.parse("2020-07-20 23:00:00"), value=0.1f))
+        insertEntry(Entry(profile=profile, date=Date(), value=0.5f))
+        Log.i(TAG, queryEntry(id.toInt()).toString())
     }
 
-
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL(DatabaseContract.ProfileEntryDB.DB_CREATE + DatabaseContract.EntryDB.DB_CREATE)
-
-        insertProfile(ProfileEntry(name = "default", minColor = Color.RED, maxColor = Color.GREEN))
+        // "Multiple statements separated by semicolons are not supported."
+        db.execSQL(DatabaseContract.ProfileEntryDB.DB_CREATE)
+        db.execSQL(DatabaseContract.EntryDB.DB_CREATE)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -108,15 +112,15 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     fun insertEntry(entry: Entry): Long {
-        if (entry.profile.id < 0) {
+        if (entry.profile == null || entry.profile!!.id < 0) {
             throw Exception("Invalid profile id for $entry")
         }
 
-        val dateStr = DatabaseContract.DATE_FORMAT.format(entry.date)
+        val dateStr = DatabaseContract.DATE_FORMAT.format(entry.date!!)
         val values = ContentValues().apply {
             put(DatabaseContract.EntryDB.DATE, dateStr)
             put(DatabaseContract.EntryDB.VALUE, entry.value)
-            put(DatabaseContract.EntryDB.PROFILE_FK, entry.profile.id)
+            put(DatabaseContract.EntryDB.PROFILE_FK, entry.profile!!.id)
         }
 
         try {
@@ -146,7 +150,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             cursor = readableDB!!.rawQuery(queryStr, null)
             cursor.moveToFirst()
             if (cursor.count == 0) {
-                return ProfileEntry(id = -1)
+                return ProfileEntry()
             }
 
             profile.id = id
@@ -161,6 +165,39 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return profile
     }
 
+    fun queryEntry(id: Int): Entry {
+        val entry = Entry()
+        val _db = DatabaseContract.EntryDB
+
+        val queryStr = """
+            SELECT *
+            FROM ${_db.TABLE_NAME}
+            WHERE _id = $id
+        """.trimIndent()
+
+        var cursor: Cursor? = null
+        try {
+            if (readableDB == null) readableDB = readableDatabase
+            cursor = readableDB!!.rawQuery(queryStr, null)
+            cursor.moveToFirst()
+            if (cursor.count == 0) {
+                return Entry()
+            }
+
+            val profileFk = cursor.getInt(cursor.getColumnIndex(_db.PROFILE_FK))
+            val dateStr = cursor.getString(cursor.getColumnIndex(_db.DATE))
+            entry.id = id
+            entry.profile = queryProfile(profileFk)
+            entry.date = DatabaseContract.DATE_FORMAT.parse(dateStr)
+            entry.value = cursor.getFloat(cursor.getColumnIndex(_db.VALUE))
+        } catch (e: Exception) {
+            Log.e(TAG, "queryEntry: ", e)
+        } finally {
+            cursor?.close()
+        }
+        return entry
+    }
+
     // Returns the difference between the latest and earliest stored date.
     fun getDateRange(profile: ProfileEntry): Int {
         return 0
@@ -170,7 +207,5 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         if (readableDB == null) readableDB = readableDatabase
         return DatabaseUtils.queryNumEntries(readableDB, DatabaseContract.ProfileEntryDB.TABLE_NAME)
     }
-
-
 }
 
