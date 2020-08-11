@@ -69,8 +69,6 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     private var writableDB: SQLiteDatabase? = null
     private var readableDB: SQLiteDatabase? = null
 
-    private val TAG: String = DatabaseHelper::class.simpleName ?: "null"
-
     // TODO execute database commands in a coroutine
     init {
         insertProfile(ProfileEntry(name="default", minColor=Color.RED, maxColor=Color.GREEN, creationDate=DatabaseContract.DATE_FORMAT.parse("2020-07-20 12:42:02")))
@@ -87,11 +85,8 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        val s = """
-            DROP TABLE IF EXISTS ${DatabaseContract.ProfileEntryDB.TABLE_NAME};
-            DROP TABLE IF EXISTS ${DatabaseContract.EntryDB.TABLE_NAME};
-        """
-        db.execSQL(s)
+        db.execSQL("DROP TABLE IF EXISTS ${DatabaseContract.ProfileEntryDB.TABLE_NAME};")
+        db.execSQL("DROP TABLE IF EXISTS ${DatabaseContract.EntryDB.TABLE_NAME};")
         onCreate(db)
     }
 
@@ -207,6 +202,10 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     fun getProfilesCount(): Long {
         if (readableDB == null) readableDB = readableDatabase
         return DatabaseUtils.queryNumEntries(readableDB, DatabaseContract.ProfileEntryDB.TABLE_NAME)
+    }
+
+    companion object {
+        val TAG = DatabaseHelper::class.simpleName ?: "null"
     }
 }
 

@@ -3,48 +3,54 @@ package com.mare5x.colorcalendar
 import android.content.Context
 import android.graphics.Color
 import android.util.AttributeSet
+import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView.OnItemClickListener
-import android.widget.BaseAdapter
-import android.widget.GridView
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-class ColorRectAdapter(private val ctx: Context, private val db: DatabaseHelper) : BaseAdapter() {
+class ColorRectAdapter(private val db: DatabaseHelper) :
+        RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
+
+    class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+        val rect: ColorRect
+
+        init {
+            v.setOnClickListener { Log.i(TAG, "$adapterPosition clicked") }
+            rect = v.findViewById(R.id.colorRect)
+        }
+    }
 
     private val profile: ProfileEntry = db.queryProfile(1)
 
-    override fun getItem(position: Int): Any {
-        return 0
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val v = LayoutInflater.from(parent.context).inflate(R.layout.color_grid_item, parent, false)
+        v.setOnClickListener { Log.i(TAG, "onCreateViewHolder: ") }
+        return ViewHolder(v)
     }
 
-    override fun getItemId(position: Int): Long {
-        return position.toLong()
-    }
-
-    override fun getCount(): Int {
+    override fun getItemCount(): Int {
         return TimeUnit.DAYS.convert(Date().time - profile.creationDate!!.time, TimeUnit.MILLISECONDS).toInt()
     }
 
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        if (convertView != null) {
-            return convertView
-        }
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        holder.rect.color = Color.BLUE
+    }
 
-        return ColorRect(ctx).apply { color = Color.parseColor("#ff0000") }
+    companion object {
+        private const val TAG = "ColorRectAdapter"
     }
 }
 
-class ColorGrid : GridView {
+class ColorGrid : RecyclerView {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
     init {
-        onItemClickListener = OnItemClickListener { parent, view, position, id ->
-            itemClickedListener(position)
-        }
-    }
+        layoutManager = GridLayoutManager(context, 7)
 
-    var itemClickedListener: (position: Int) -> Unit = {}
+    }
 }
