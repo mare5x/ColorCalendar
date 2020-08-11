@@ -27,13 +27,15 @@ private object DatabaseContract {
         const val PROFILE_NAME = "name"
         const val MIN_COLOR = "min_color"
         const val MAX_COLOR = "max_color"
+        const val CREATION_DATE = "creation_date"
 
         const val DB_CREATE = """
             CREATE TABLE ${TABLE_NAME}(
                 ${BaseColumns._ID} INTEGER PRIMARY KEY,
                 $PROFILE_NAME TEXT NOT NULL,
                 $MIN_COLOR INTEGER NOT NULL,
-                $MAX_COLOR INTEGER NOT NULL
+                $MAX_COLOR INTEGER NOT NULL,
+                $CREATION_DATE TEXT NOT NULL
             );
         """
     }
@@ -58,7 +60,7 @@ private object DatabaseContract {
 }
 
 
-data class ProfileEntry(var id: Int = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0)
+data class ProfileEntry(var id: Int = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0, var creationDate: Date? = Date())
 
 data class Entry(var id: Int = -1, var profile: ProfileEntry? = null, var date: Date? = null, var value: Float = 0f)
 
@@ -71,7 +73,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
     // TODO execute database commands in a coroutine
     init {
-        insertProfile(ProfileEntry(name="default", minColor=Color.RED, maxColor=Color.GREEN))
+        insertProfile(ProfileEntry(name="default", minColor=Color.RED, maxColor=Color.GREEN, creationDate=DatabaseContract.DATE_FORMAT.parse("2020-07-20 12:42:02")))
         val profile = queryProfile(1)
         val id = insertEntry(Entry(profile=profile, date=DatabaseContract.DATE_FORMAT.parse("2020-07-20 23:00:00"), value=0.1f))
         insertEntry(Entry(profile=profile, date=Date(), value=0.5f))
@@ -94,10 +96,12 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     fun insertProfile(profile: ProfileEntry): Long {
+        val profileDB = DatabaseContract.ProfileEntryDB
         val values = ContentValues().apply {
-            put(DatabaseContract.ProfileEntryDB.PROFILE_NAME, profile.name)
-            put(DatabaseContract.ProfileEntryDB.MIN_COLOR, profile.minColor)
-            put(DatabaseContract.ProfileEntryDB.MAX_COLOR, profile.maxColor)
+            put(profileDB.PROFILE_NAME, profile.name)
+            put(profileDB.MIN_COLOR, profile.minColor)
+            put(profileDB.MAX_COLOR, profile.maxColor)
+            put(profileDB.CREATION_DATE, DatabaseContract.DATE_FORMAT.format(profile.creationDate))
         }
 
         try {
@@ -136,11 +140,11 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
     fun queryProfile(id: Int): ProfileEntry {
         val profile = ProfileEntry()
-        val _db = DatabaseContract.ProfileEntryDB
+        val profileDB = DatabaseContract.ProfileEntryDB
 
         val queryStr = """
             SELECT *
-            FROM ${_db.TABLE_NAME}
+            FROM ${profileDB.TABLE_NAME}
             WHERE _id = $id
         """.trimIndent()
 
@@ -154,9 +158,11 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             }
 
             profile.id = id
-            profile.name = cursor.getString(cursor.getColumnIndex(_db.PROFILE_NAME))
-            profile.minColor = cursor.getInt(cursor.getColumnIndex(_db.MIN_COLOR))
-            profile.maxColor = cursor.getInt(cursor.getColumnIndex(_db.MAX_COLOR))
+            profile.name = cursor.getString(cursor.getColumnIndex(profileDB.PROFILE_NAME))
+            profile.minColor = cursor.getInt(cursor.getColumnIndex(profileDB.MIN_COLOR))
+            profile.maxColor = cursor.getInt(cursor.getColumnIndex(profileDB.MAX_COLOR))
+            profile.creationDate = DatabaseContract.DATE_FORMAT.parse(
+                cursor.getString(cursor.getColumnIndex(profileDB.CREATION_DATE)))
         } catch (e: Exception) {
             Log.e(TAG, "queryProfile: ", e)
         } finally {
@@ -167,11 +173,11 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
     fun queryEntry(id: Int): Entry {
         val entry = Entry()
-        val _db = DatabaseContract.EntryDB
+        val entryDB = DatabaseContract.EntryDB
 
         val queryStr = """
             SELECT *
-            FROM ${_db.TABLE_NAME}
+            FROM ${entryDB.TABLE_NAME}
             WHERE _id = $id
         """.trimIndent()
 
@@ -184,23 +190,18 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
                 return Entry()
             }
 
-            val profileFk = cursor.getInt(cursor.getColumnIndex(_db.PROFILE_FK))
-            val dateStr = cursor.getString(cursor.getColumnIndex(_db.DATE))
+            val profileFk = cursor.getInt(cursor.getColumnIndex(entryDB.PROFILE_FK))
+            val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
             entry.id = id
             entry.profile = queryProfile(profileFk)
             entry.date = DatabaseContract.DATE_FORMAT.parse(dateStr)
-            entry.value = cursor.getFloat(cursor.getColumnIndex(_db.VALUE))
+            entry.value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
         } catch (e: Exception) {
             Log.e(TAG, "queryEntry: ", e)
         } finally {
             cursor?.close()
         }
         return entry
-    }
-
-    // Returns the difference between the latest and earliest stored date.
-    fun getDateRange(profile: ProfileEntry): Int {
-        return 0
     }
 
     fun getProfilesCount(): Long {

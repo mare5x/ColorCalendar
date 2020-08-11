@@ -8,8 +8,12 @@ import android.view.ViewGroup
 import android.widget.AdapterView.OnItemClickListener
 import android.widget.BaseAdapter
 import android.widget.GridView
+import java.util.*
+import java.util.concurrent.TimeUnit
 
 class ColorRectAdapter(private val ctx: Context, private val db: DatabaseHelper) : BaseAdapter() {
+
+    private val profile: ProfileEntry = db.queryProfile(1)
 
     override fun getItem(position: Int): Any {
         return 0
@@ -20,14 +24,13 @@ class ColorRectAdapter(private val ctx: Context, private val db: DatabaseHelper)
     }
 
     override fun getCount(): Int {
-        return 1000
+        return TimeUnit.DAYS.convert(Date().time - profile.creationDate!!.time, TimeUnit.MILLISECONDS).toInt()
     }
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         if (convertView != null) {
             return convertView
         }
-
 
         return ColorRect(ctx).apply { color = Color.parseColor("#ff0000") }
     }
