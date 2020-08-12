@@ -7,7 +7,6 @@ import android.database.Cursor
 import android.database.DatabaseUtils
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-import android.graphics.Color
 import android.provider.BaseColumns
 import android.util.Log
 import java.text.SimpleDateFormat
@@ -19,6 +18,7 @@ private object DatabaseContract {
     const val DB_NAME = "database.db"
     const val DB_VERSION = 1
 
+    // TODO store dates as longs
     @SuppressLint("SimpleDateFormat")
     val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")  // ISO8601
 
@@ -71,11 +71,13 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
     // TODO execute database commands in a coroutine
     init {
+        /*
         insertProfile(ProfileEntry(name="default", minColor=Color.RED, maxColor=Color.GREEN, creationDate=DatabaseContract.DATE_FORMAT.parse("2020-07-20 12:42:02")))
         val profile = queryProfile(1)
         val id = insertEntry(Entry(profile=profile, date=DatabaseContract.DATE_FORMAT.parse("2020-07-20 23:00:00"), value=0.1f))
         insertEntry(Entry(profile=profile, date=Date(), value=0.5f))
         Log.i(TAG, queryEntry(id.toInt()).toString())
+        */
     }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -191,6 +193,38 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             entry.profile = queryProfile(profileFk)
             entry.date = DatabaseContract.DATE_FORMAT.parse(dateStr)
             entry.value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
+        } catch (e: Exception) {
+            Log.e(TAG, "queryEntry: ", e)
+        } finally {
+            cursor?.close()
+        }
+        return entry
+    }
+
+    fun queryEntry(profile: ProfileEntry, date: Date) : Entry? {
+        val entryDB = DatabaseContract.EntryDB
+        val queryStr = """
+            SELECT *
+            FROM ${entryDB.TABLE_NAME}
+            WHERE ${entryDB.PROFILE_FK} = ${profile.id} AND
+                date(${entryDB.DATE}) = date('${DatabaseContract.DATE_FORMAT.format(date)}')
+        """.trimIndent()
+
+        var cursor: Cursor? = null
+        var entry: Entry? = null
+        try {
+            if (readableDB == null) readableDB = readableDatabase
+            cursor = readableDB!!.rawQuery(queryStr, null)
+            cursor.moveToFirst()
+            if (cursor.count > 0) {
+                val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
+                entry = Entry(
+                    id = cursor.getInt(cursor.getColumnIndex(BaseColumns._ID)),
+                    profile = profile,
+                    date = DatabaseContract.DATE_FORMAT.parse(dateStr),
+                    value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
+                )
+            }
         } catch (e: Exception) {
             Log.e(TAG, "queryEntry: ", e)
         } finally {

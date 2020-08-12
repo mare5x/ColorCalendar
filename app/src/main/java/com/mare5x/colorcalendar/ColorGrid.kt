@@ -11,6 +11,11 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
+
+fun calcDateDifference(d: Date): Int {
+    return TimeUnit.DAYS.convert(Date().time - d.time, TimeUnit.MILLISECONDS).toInt()
+}
 
 class ColorRectAdapter(private val db: DatabaseHelper) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
@@ -28,16 +33,22 @@ class ColorRectAdapter(private val db: DatabaseHelper) :
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.color_grid_item, parent, false)
-        v.setOnClickListener { Log.i(TAG, "onCreateViewHolder: ") }
         return ViewHolder(v)
     }
 
-    override fun getItemCount(): Int {
-        return TimeUnit.DAYS.convert(Date().time - profile.creationDate!!.time, TimeUnit.MILLISECONDS).toInt()
-    }
+    override fun getItemCount(): Int = 10000 //calcDateDifference(profile.creationDate!!)
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.rect.color = Color.BLUE
+        // Use 'position' as the number of days since profile creation date.
+
+        val date = Calendar.getInstance().apply {
+            time = profile.creationDate!!
+            add(Calendar.DAY_OF_MONTH, position)
+        }.time
+
+        // TODO database operations shouldn't run on the main thread
+        val entry = db.queryEntry(profile, date)
+        holder.rect.color = if (entry != null) Color.rgb((255 * entry.value).roundToInt(), 0, 0) else Color.GRAY
     }
 
     companion object {
