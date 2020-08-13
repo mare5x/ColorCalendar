@@ -233,6 +233,33 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return entry
     }
 
+    fun queryAllEntries(profile: ProfileEntry) : Array<Entry> {
+        val entryDB = DatabaseContract.EntryDB
+        val queryStr = """
+            SELECT *
+            FROM ${entryDB.TABLE_NAME}
+            WHERE ${entryDB.PROFILE_FK} = ${profile.id}
+        """.trimIndent()
+
+        if (readableDB == null) readableDB = readableDatabase
+        val cursor = readableDB!!.rawQuery(queryStr, null)
+
+        cursor.moveToFirst()
+        val res = Array(cursor.count) { i ->
+            val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
+            val entry = Entry(
+                id = cursor.getInt(cursor.getColumnIndex(BaseColumns._ID)),
+                profile = profile,
+                date = DatabaseContract.DATE_FORMAT.parse(dateStr),
+                value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
+            )
+            cursor.moveToNext()
+            entry
+        }
+        cursor.close()
+        return res
+    }
+
     fun getProfilesCount(): Long {
         if (readableDB == null) readableDB = readableDatabase
         return DatabaseUtils.queryNumEntries(readableDB, DatabaseContract.ProfileEntryDB.TABLE_NAME)

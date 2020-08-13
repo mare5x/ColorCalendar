@@ -7,11 +7,17 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ColorGridFragment : Fragment() {
     private var grid: ColorGrid? = null
     private lateinit var adapter: ColorRectAdapter
+    private lateinit var db: DatabaseHelper
+    private lateinit var profile: ProfileEntry
 
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?,
@@ -30,11 +36,43 @@ class ColorGridFragment : Fragment() {
 
         grid = view.findViewById(R.id.colorGrid)
         grid!!.adapter = adapter
+
+        fetchGridData(profile)
     }
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
-        adapter = ColorRectAdapter(DatabaseHelper(context))
+        db = DatabaseHelper(context)
+        profile = db.queryProfile(1)
+        adapter = ColorRectAdapter(profile)
         grid?.adapter = adapter
+    }
+
+    private fun fetchGridData(profile: ProfileEntry) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val entries = db.queryAllEntries(profile)
+            val dayEntries = Array<MutableList<Entry>>(adapter.itemCount) { mutableListOf() }
+            entries.forEach {
+                if (it.date != null) {
+                    val day = calcDayDifference(profile.creationDate!!, it.date!!)
+                    dayEntries[day].add(it)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                adapter.dayEntries = dayEntries
+            }
+        }
+
+        /*
+        val entries = db.queryAllEntries(profile)
+        val dayEntries = Array<MutableList<Entry>>(adapter.itemCount) { mutableListOf() }
+        entries.forEach {
+            if (it.date != null) {
+                val day = calcDayDifference(profile.creationDate!!, it.date!!)
+                dayEntries[day].add(it)
+            }
+        }
+        adapter.dayEntries = dayEntries
+        */
     }
 }

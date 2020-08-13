@@ -13,11 +13,26 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
-fun calcDateDifference(d: Date): Int {
-    return TimeUnit.DAYS.convert(Date().time - d.time, TimeUnit.MILLISECONDS).toInt()
+fun calcDayDifference(d1: Date, d2: Date): Int {
+    // Remove time information to calculate only the difference in days ...
+    val t1 = Calendar.getInstance().apply {
+        time = d1
+        set(Calendar.SECOND, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+    val t2 = Calendar.getInstance().apply {
+        time = d2
+        set(Calendar.SECOND, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+    return TimeUnit.DAYS.convert(t2 - t1, TimeUnit.MILLISECONDS).toInt()
 }
 
-class ColorRectAdapter(private val db: DatabaseHelper) :
+class ColorRectAdapter(private val profile: ProfileEntry) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
 
     class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
@@ -29,7 +44,11 @@ class ColorRectAdapter(private val db: DatabaseHelper) :
         }
     }
 
-    private val profile: ProfileEntry = db.queryProfile(1)
+    var dayEntries: Array<MutableList<Entry>> = Array(itemCount) { mutableListOf<Entry>() }
+        set(value) {
+            field = value
+            notifyDataSetChanged()
+        }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.color_grid_item, parent, false)
@@ -40,14 +59,7 @@ class ColorRectAdapter(private val db: DatabaseHelper) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         // Use 'position' as the number of days since profile creation date.
-
-        val date = Calendar.getInstance().apply {
-            time = profile.creationDate!!
-            add(Calendar.DAY_OF_MONTH, position)
-        }.time
-
-        // TODO database operations shouldn't run on the main thread
-        val entry = db.queryEntry(profile, date)
+        val entry = if (dayEntries[position].size > 0) dayEntries[position][0] else null
         holder.rect.color = if (entry != null) Color.rgb((255 * entry.value).roundToInt(), 0, 0) else Color.GRAY
     }
 
