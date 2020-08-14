@@ -7,11 +7,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.observe
 import androidx.navigation.fragment.findNavController
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class ColorGridFragment : Fragment() {
     private var grid: ColorGrid? = null
@@ -37,7 +35,15 @@ class ColorGridFragment : Fragment() {
         grid = view.findViewById(R.id.colorGrid)
         grid!!.adapter = adapter
 
-        fetchGridData(profile)
+        // Structure:
+        // Data is stored in the view model. The view model fetches data from the database in
+        // a separate coroutine. The view model's live data is observed for changes, which notify
+        // the grid adapter with new data. The adapter is given the data and creates the views for
+        // grid (RecyclerView).
+        val model: ColorGridViewModel by viewModels { ColorGridViewModelFactory(profile, db) }
+        model.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
+            adapter.dayEntries = entries
+        }
     }
 
     override fun onAttach(context: Context) {
@@ -46,33 +52,5 @@ class ColorGridFragment : Fragment() {
         profile = db.queryProfile(1)
         adapter = ColorRectAdapter(profile)
         grid?.adapter = adapter
-    }
-
-    private fun fetchGridData(profile: ProfileEntry) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val entries = db.queryAllEntries(profile)
-            val dayEntries = Array<MutableList<Entry>>(adapter.itemCount) { mutableListOf() }
-            entries.forEach {
-                if (it.date != null) {
-                    val day = calcDayDifference(profile.creationDate!!, it.date!!)
-                    dayEntries[day].add(it)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                adapter.dayEntries = dayEntries
-            }
-        }
-
-        /*
-        val entries = db.queryAllEntries(profile)
-        val dayEntries = Array<MutableList<Entry>>(adapter.itemCount) { mutableListOf() }
-        entries.forEach {
-            if (it.date != null) {
-                val day = calcDayDifference(profile.creationDate!!, it.date!!)
-                dayEntries[day].add(it)
-            }
-        }
-        adapter.dayEntries = dayEntries
-        */
     }
 }

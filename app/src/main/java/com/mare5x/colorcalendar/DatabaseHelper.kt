@@ -60,7 +60,7 @@ private object DatabaseContract {
 }
 
 
-data class ProfileEntry(var id: Int = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0, var creationDate: Date? = Date())
+data class ProfileEntry(var id: Int = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0, var creationDate: Date = Date())
 
 data class Entry(var id: Int = -1, var profile: ProfileEntry? = null, var date: Date? = null, var value: Float = 0f)
 
@@ -245,7 +245,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         val cursor = readableDB!!.rawQuery(queryStr, null)
 
         cursor.moveToFirst()
-        val res = Array(cursor.count) { i ->
+        val res = Array(cursor.count) {
             val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
             val entry = Entry(
                 id = cursor.getInt(cursor.getColumnIndex(BaseColumns._ID)),

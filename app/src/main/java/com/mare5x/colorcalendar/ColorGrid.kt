@@ -7,8 +7,10 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.lifecycle.*
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
@@ -32,7 +34,47 @@ fun calcDayDifference(d1: Date, d2: Date): Int {
     return TimeUnit.DAYS.convert(t2 - t1, TimeUnit.MILLISECONDS).toInt()
 }
 
-class ColorRectAdapter(private val profile: ProfileEntry) :
+fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creationDate, Date())
+
+typealias EntryList = Array<MutableList<Entry>>
+
+class ColorGridViewModel(profile: ProfileEntry, private val db: DatabaseHelper) : ViewModel() {
+    private val entriesByDay = MutableLiveData<EntryList>()
+
+    init {
+        fetchGridEntries(profile)
+    }
+
+    fun getEntriesByDay() = entriesByDay
+
+    private fun fetchGridEntries(profile: ProfileEntry) {
+        viewModelScope.launch {
+            val entries = db.queryAllEntries(profile)
+
+            val dayEntries = EntryList(getProfileDayAge(profile)) { mutableListOf() }
+            entries.forEach {
+                if (it.date != null) {
+                    val day = calcDayDifference(profile.creationDate, it.date!!)
+                    dayEntries[day].add(it)
+                }
+            }
+
+            entriesByDay.postValue(dayEntries)
+        }
+    }
+}
+
+class ColorGridViewModelFactory(
+    private val profile: ProfileEntry, private val db: DatabaseHelper
+) : ViewModelProvider.Factory {
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+        return ColorGridViewModel(profile, db) as T
+    }
+}
+
+class ColorRectAdapter(profile: ProfileEntry) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
 
     class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
@@ -44,7 +86,7 @@ class ColorRectAdapter(private val profile: ProfileEntry) :
         }
     }
 
-    var dayEntries: Array<MutableList<Entry>> = Array(itemCount) { mutableListOf<Entry>() }
+    var dayEntries: EntryList = Array(getProfileDayAge(profile)) { mutableListOf<Entry>() }
         set(value) {
             field = value
             notifyDataSetChanged()
@@ -55,7 +97,7 @@ class ColorRectAdapter(private val profile: ProfileEntry) :
         return ViewHolder(v)
     }
 
-    override fun getItemCount(): Int = 10000 //calcDateDifference(profile.creationDate!!)
+    override fun getItemCount(): Int = dayEntries.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         // Use 'position' as the number of days since profile creation date.
