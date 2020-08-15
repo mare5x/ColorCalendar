@@ -21,6 +21,7 @@ class ColorRect : View {
         set(value) {
             field = value
             rectDrawable.paint.color = value
+            invalidate()
         }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

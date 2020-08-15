@@ -37,4 +37,7 @@ class ColorSeekBar : androidx.appcompat.widget.AppCompatSeekBar {
             background = drawable
         }
     }
+
+    // min = 0
+    fun getRange() = max
 }
