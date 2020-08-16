@@ -7,7 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.observe
 import androidx.navigation.fragment.findNavController
 
@@ -36,13 +36,20 @@ class ColorGridFragment : Fragment() {
         grid!!.adapter = adapter
 
         // Structure:
-        // Data is stored in the view model. The view model fetches data from the database in
-        // a separate coroutine. The view model's live data is observed for changes, which notify
-        // the grid adapter with new data. The adapter is given the data and creates the views for
+        // Data is stored in a database. The view model fetches data from the database in
+        // a separate coroutine. The view model's live data is observed for changes, which notifies
+        // the grid adapter. The adapter is given the data and creates the views for
         // grid (RecyclerView).
-        val model: ColorGridViewModel by viewModels { ColorGridViewModelFactory(profile, db) }
+        // The view model is owned by the parent activity.
+        val model: ColorGridViewModel by activityViewModels { ColorGridViewModelFactory(profile, db) }
         model.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
             adapter.dayEntries = entries
+        }
+        model.getLastEntry().observe(viewLifecycleOwner) { entry ->
+            if (entry.id != -1L) {
+                val position = calcDayDifference(profile.creationDate, entry.date!!)
+                adapter.notifyItemChanged(position)
+            }
         }
     }
 

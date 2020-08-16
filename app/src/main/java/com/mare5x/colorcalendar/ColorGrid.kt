@@ -34,18 +34,21 @@ fun calcDayDifference(d1: Date, d2: Date): Int {
     return TimeUnit.DAYS.convert(t2 - t1, TimeUnit.MILLISECONDS).toInt()
 }
 
-fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creationDate, Date())
+fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creationDate, Date()) + 1
 
 typealias EntryList = Array<MutableList<Entry>>
 
-class ColorGridViewModel(profile: ProfileEntry, private val db: DatabaseHelper) : ViewModel() {
+class ColorGridViewModel(private val profile: ProfileEntry, private val db: DatabaseHelper) : ViewModel() {
     private val entriesByDay = MutableLiveData<EntryList>()
+    private val lastEntry = MutableLiveData<Entry>()
 
     init {
         fetchGridEntries(profile)
     }
 
     fun getEntriesByDay() = entriesByDay
+
+    fun getLastEntry() = lastEntry
 
     private fun fetchGridEntries(profile: ProfileEntry) {
         viewModelScope.launch {
@@ -61,6 +64,17 @@ class ColorGridViewModel(profile: ProfileEntry, private val db: DatabaseHelper) 
 
             entriesByDay.postValue(dayEntries)
         }
+    }
+
+    fun insertEntry(entry: Entry) {
+        entry.profile = profile
+        entry.date = Date()
+        entry.id = db.insertEntry(entry)
+        if (entry.id != -1L) {
+            val day = calcDayDifference(profile.creationDate, entry.date!!)
+            entriesByDay.value!![day].add(entry)
+        }
+        lastEntry.postValue(entry)
     }
 }
 
@@ -86,6 +100,7 @@ class ColorRectAdapter(profile: ProfileEntry) :
         }
     }
 
+    // Refers to the list in the view model.
     var dayEntries: EntryList = Array(getProfileDayAge(profile)) { mutableListOf<Entry>() }
         set(value) {
             field = value
@@ -101,7 +116,7 @@ class ColorRectAdapter(profile: ProfileEntry) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         // Use 'position' as the number of days since profile creation date.
-        val entry = if (dayEntries[position].size > 0) dayEntries[position][0] else null
+        val entry = if (dayEntries[position].size > 0) dayEntries[position].last() else null
         holder.rect.color = if (entry != null) Color.rgb((255 * entry.value).roundToInt(), 0, 0) else Color.GRAY
     }
 

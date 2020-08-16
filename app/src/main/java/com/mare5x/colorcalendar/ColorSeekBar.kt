@@ -71,4 +71,8 @@ class ColorPickerBar : ConstraintLayout {
         val x = progress / seekBar.max.toFloat()
         colorRect.color = calcGradientColor(Color.RED, Color.GREEN, x)
     }
+
+    fun getProgress(): Float {
+        return seekBar.progress / seekBar.max.toFloat()
+    }
 }

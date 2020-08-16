@@ -60,9 +60,9 @@ private object DatabaseContract {
 }
 
 
-data class ProfileEntry(var id: Int = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0, var creationDate: Date = Date())
+data class ProfileEntry(var id: Long = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0, var creationDate: Date = Date())
 
-data class Entry(var id: Int = -1, var profile: ProfileEntry? = null, var date: Date? = null, var value: Float = 0f)
+data class Entry(var id: Long = -1, var profile: ProfileEntry? = null, var date: Date? = null, var value: Float = 0f)
 
 
 class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
@@ -135,7 +135,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return -1
     }
 
-    fun queryProfile(id: Int): ProfileEntry {
+    fun queryProfile(id: Long): ProfileEntry {
         val profile = ProfileEntry()
         val profileDB = DatabaseContract.ProfileEntryDB
 
@@ -168,7 +168,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return profile
     }
 
-    fun queryEntry(id: Int): Entry {
+    fun queryEntry(id: Long): Entry {
         val entry = Entry()
         val entryDB = DatabaseContract.EntryDB
 
@@ -187,7 +187,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
                 return Entry()
             }
 
-            val profileFk = cursor.getInt(cursor.getColumnIndex(entryDB.PROFILE_FK))
+            val profileFk = cursor.getLong(cursor.getColumnIndex(entryDB.PROFILE_FK))
             val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
             entry.id = id
             entry.profile = queryProfile(profileFk)
@@ -219,7 +219,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             if (cursor.count > 0) {
                 val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
                 entry = Entry(
-                    id = cursor.getInt(cursor.getColumnIndex(BaseColumns._ID)),
+                    id = cursor.getLong(cursor.getColumnIndex(BaseColumns._ID)),
                     profile = profile,
                     date = DatabaseContract.DATE_FORMAT.parse(dateStr),
                     value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
@@ -248,7 +248,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         val res = Array(cursor.count) {
             val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
             val entry = Entry(
-                id = cursor.getInt(cursor.getColumnIndex(BaseColumns._ID)),
+                id = cursor.getLong(cursor.getColumnIndex(BaseColumns._ID)),
                 profile = profile,
                 date = DatabaseContract.DATE_FORMAT.parse(dateStr),
                 value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))

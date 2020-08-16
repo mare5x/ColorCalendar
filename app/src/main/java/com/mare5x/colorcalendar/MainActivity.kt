@@ -3,11 +3,15 @@ package com.mare5x.colorcalendar
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener {
+
+    // Shared ViewModel.
+    private val gridViewModel: ColorGridViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,5 +38,15 @@ class MainActivity : AppCompatActivity() {
             R.id.action_settings -> true
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    override fun onColorConfirm(value: Float) {
+        gridViewModel.insertEntry(Entry(value = value))
+    }
+
+    override fun onColorCancel(value: Float) { }
+
+    companion object {
+        private const val TAG = "MainActivity"
     }
 }
