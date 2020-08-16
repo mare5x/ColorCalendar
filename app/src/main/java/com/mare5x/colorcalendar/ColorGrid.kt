@@ -73,6 +73,7 @@ class ColorGridViewModel(private val profile: ProfileEntry, private val db: Data
         if (entry.id != -1L) {
             val day = calcDayDifference(profile.creationDate, entry.date!!)
             entriesByDay.value!![day].add(entry)
+            // TODO ensure day list is big enough (midnight ...)
         }
         lastEntry.postValue(entry)
     }
@@ -94,8 +95,10 @@ class ColorRectAdapter(profile: ProfileEntry) :
     class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
         val rect: ColorRect
 
+        var clickListener: (position: Int) -> Unit = { }
+
         init {
-            v.setOnClickListener { Log.i(TAG, "$adapterPosition clicked") }
+            v.setOnClickListener { clickListener(adapterPosition) }
             rect = v.findViewById(R.id.colorRect)
         }
     }
@@ -107,9 +110,11 @@ class ColorRectAdapter(profile: ProfileEntry) :
             notifyDataSetChanged()
         }
 
+    var clickListener: (position: Int) -> Unit = { }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.color_grid_item, parent, false)
-        return ViewHolder(v)
+        return ViewHolder(v).also { h -> h.clickListener = clickListener }
     }
 
     override fun getItemCount(): Int = dayEntries.size
@@ -131,6 +136,5 @@ class ColorGrid : RecyclerView {
 
     init {
         layoutManager = GridLayoutManager(context, 7)
-
     }
 }

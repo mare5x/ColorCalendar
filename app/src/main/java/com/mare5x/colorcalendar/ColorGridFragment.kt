@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.observe
@@ -28,13 +29,6 @@ class ColorGridFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        view.findViewById<Button>(R.id.button_first).setOnClickListener {
-            findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
-        }
-
-        grid = view.findViewById(R.id.colorGrid)
-        grid!!.adapter = adapter
-
         // Structure:
         // Data is stored in a database. The view model fetches data from the database in
         // a separate coroutine. The view model's live data is observed for changes, which notifies
@@ -50,6 +44,18 @@ class ColorGridFragment : Fragment() {
                 val position = calcDayDifference(profile.creationDate, entry.date!!)
                 adapter.notifyItemChanged(position)
             }
+        }
+
+        grid = view.findViewById(R.id.colorGrid)
+        grid!!.adapter = adapter
+
+        view.findViewById<Button>(R.id.button_first).setOnClickListener {
+            findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
+        }
+
+        adapter.clickListener = { day ->
+            val dayEntries = model.getEntriesByDay().value
+            Toast.makeText(context, "Day: $day (${dayEntries?.get(day)?.size})", Toast.LENGTH_SHORT).show()
         }
     }
 
