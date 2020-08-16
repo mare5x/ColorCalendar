@@ -7,6 +7,9 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.util.AttributeSet
+import android.view.LayoutInflater
+import android.widget.SeekBar
+import androidx.constraintlayout.widget.ConstraintLayout
 import kotlin.math.roundToInt
 
 fun calcGradientColor(startColor: Int, endColor: Int, x: Float) : Int {
@@ -40,4 +43,32 @@ class ColorSeekBar : androidx.appcompat.widget.AppCompatSeekBar {
 
     // min = 0
     fun getRange() = max
+}
+
+class ColorPickerBar : ConstraintLayout {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    private var colorRect: ColorRect
+    private var seekBar: ColorSeekBar
+
+    init {
+        LayoutInflater.from(context).inflate(R.layout.color_picker_view, this, true)
+
+        colorRect = findViewById(R.id.colorRect)
+        seekBar = findViewById(R.id.colorSeekBar)
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) =
+                updateColorRect(progress)
+            override fun onStartTrackingTouch(seekBar: SeekBar) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar) {}
+        })
+
+        updateColorRect(seekBar.progress)
+    }
+
+    fun updateColorRect(progress: Int) {
+        val x = progress / seekBar.max.toFloat()
+        colorRect.color = calcGradientColor(Color.RED, Color.GREEN, x)
+    }
 }

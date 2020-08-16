@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/colorPicker"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <com.mare5x.colorcalendar.ColorSeekBar
         android:id="@+id/colorSeekBar"
@@ -22,14 +18,11 @@
         app:layout_constraintBottom_toBottomOf="@+id/colorRect"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/colorRect"
-        app:layout_constraintTop_toTopOf="@+id/colorRect"
-        app:layout_constraintWidth_min="100dp"
-        app:layout_constraintWidth_percent="0.7"
-        />
+        app:layout_constraintTop_toTopOf="@+id/colorRect" />
 
     <com.mare5x.colorcalendar.ColorRect
         android:id="@+id/colorRect"
-        android:layout_width="46dp"
+        android:layout_width="36dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginLeft="16dp"
@@ -38,4 +31,4 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+</merge>
