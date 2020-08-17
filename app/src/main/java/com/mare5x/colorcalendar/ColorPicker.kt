@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.activityViewModels
 
 
 // Use either as a dialog or as a fragment.
@@ -18,6 +19,7 @@ class ColorPickerDialogFragment : DialogFragment() {
         fun onColorCancel(value: Float)
     }
 
+    private val gridViewModel: ColorGridViewModel by activityViewModels()
     private var listener: ColorPickerListener? = null
 
     override fun onCreateView(
@@ -32,24 +34,26 @@ class ColorPickerDialogFragment : DialogFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorPickerBar)
+        val profile = gridViewModel.getProfile().value
+        if (profile != null)
+            colorPickerBar.setColors(profile.minColor, profile.maxColor)
 
         val cancelButton = view.findViewById<Button>(R.id.cancelButton)
         cancelButton.setOnClickListener {
-            listener?.onColorCancel(colorPickerBar.getProgress())
+            listener?.onColorCancel(colorPickerBar.getNormProgress())
             if (showsDialog)
                 dismiss()
         }
         val confirmButton = view.findViewById<Button>(R.id.confirmButton)
         confirmButton.setOnClickListener {
-            listener?.onColorConfirm(colorPickerBar.getProgress())
+            listener?.onColorConfirm(colorPickerBar.getNormProgress())
             if (showsDialog)
                 dismiss()
         }
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val dialog = super.onCreateDialog(savedInstanceState)
-        return dialog
+        return super.onCreateDialog(savedInstanceState)
     }
 
     /*

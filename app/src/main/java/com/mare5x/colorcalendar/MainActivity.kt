@@ -10,13 +10,16 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener {
 
-    // Shared ViewModel.
-    private val gridViewModel: ColorGridViewModel by viewModels()
+    private lateinit var db: DatabaseHelper
+    private val gridViewModel: ColorGridViewModel by viewModels { ColorGridViewModelFactory(db) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(findViewById(R.id.toolbar))
+
+        db = DatabaseHelper(this)
+        gridViewModel.setProfile(1)
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
             val dialog = ColorPickerDialogFragment()

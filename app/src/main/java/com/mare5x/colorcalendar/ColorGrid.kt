@@ -3,7 +3,6 @@ package com.mare5x.colorcalendar
 import android.content.Context
 import android.graphics.Color
 import android.util.AttributeSet
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,7 +12,6 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
-import kotlin.math.roundToInt
 
 fun calcDayDifference(d1: Date, d2: Date): Int {
     // Remove time information to calculate only the difference in days ...
@@ -38,17 +36,25 @@ fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creation
 
 typealias EntryList = Array<MutableList<Entry>>
 
-class ColorGridViewModel(private val profile: ProfileEntry, private val db: DatabaseHelper) : ViewModel() {
-    private val entriesByDay = MutableLiveData<EntryList>()
-    private val lastEntry = MutableLiveData<Entry>()
+class ColorGridViewModel(private val db: DatabaseHelper) : ViewModel() {
+    private val entriesByDayData = MutableLiveData<EntryList>()
+    private val lastEntryData = MutableLiveData<Entry>()
+    private val profileData = MutableLiveData<ProfileEntry>()
 
-    init {
+    fun getEntriesByDay() = entriesByDayData
+
+    fun getLastEntry() = lastEntryData
+
+    fun getProfile() = profileData
+
+    fun setProfile(profile: ProfileEntry) {
+        profileData.value = profile
         fetchGridEntries(profile)
     }
 
-    fun getEntriesByDay() = entriesByDay
-
-    fun getLastEntry() = lastEntry
+    fun setProfile(profileId: Long) {
+        setProfile(db.queryProfile(profileId))
+    }
 
     private fun fetchGridEntries(profile: ProfileEntry) {
         viewModelScope.launch {
@@ -62,30 +68,29 @@ class ColorGridViewModel(private val profile: ProfileEntry, private val db: Data
                 }
             }
 
-            entriesByDay.postValue(dayEntries)
+            entriesByDayData.postValue(dayEntries)
         }
     }
 
     fun insertEntry(entry: Entry) {
+        val profile = profileData.value!!
         entry.profile = profile
         entry.date = Date()
         entry.id = db.insertEntry(entry)
         if (entry.id != -1L) {
             val day = calcDayDifference(profile.creationDate, entry.date!!)
-            entriesByDay.value!![day].add(entry)
+            entriesByDayData.value!![day].add(entry)
             // TODO ensure day list is big enough (midnight ...)
         }
-        lastEntry.postValue(entry)
+        lastEntryData.postValue(entry)
     }
 }
 
-class ColorGridViewModelFactory(
-    private val profile: ProfileEntry, private val db: DatabaseHelper
-) : ViewModelProvider.Factory {
+class ColorGridViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel?> create(modelClass: Class<T>): T {
-        return ColorGridViewModel(profile, db) as T
+        return ColorGridViewModel(db) as T
     }
 }
 
@@ -102,6 +107,11 @@ class ColorRectAdapter(profile: ProfileEntry) :
             rect = v.findViewById(R.id.colorRect)
         }
     }
+
+    var profile: ProfileEntry = profile
+        set(value) {
+            field = value
+        }
 
     // Refers to the list in the view model.
     var dayEntries: EntryList = Array(getProfileDayAge(profile)) { mutableListOf<Entry>() }
@@ -122,7 +132,9 @@ class ColorRectAdapter(profile: ProfileEntry) :
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         // Use 'position' as the number of days since profile creation date.
         val entry = if (dayEntries[position].size > 0) dayEntries[position].last() else null
-        holder.rect.color = if (entry != null) Color.rgb((255 * entry.value).roundToInt(), 0, 0) else Color.GRAY
+        holder.rect.color = if (entry != null)
+            calcGradientColor(profile.minColor, profile.maxColor, entry.value)
+            else Color.GRAY
     }
 
     companion object {

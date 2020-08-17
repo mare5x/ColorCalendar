@@ -1,6 +1,5 @@
 package com.mare5x.colorcalendar
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,8 +14,6 @@ import androidx.navigation.fragment.findNavController
 class ColorGridFragment : Fragment() {
     private var grid: ColorGrid? = null
     private lateinit var adapter: ColorRectAdapter
-    private lateinit var db: DatabaseHelper
-    private lateinit var profile: ProfileEntry
 
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?,
@@ -35,17 +32,22 @@ class ColorGridFragment : Fragment() {
         // the grid adapter. The adapter is given the data and creates the views for
         // grid (RecyclerView).
         // The view model is owned by the parent activity.
-        val model: ColorGridViewModel by activityViewModels { ColorGridViewModelFactory(profile, db) }
+        val model: ColorGridViewModel by activityViewModels()
         model.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
             adapter.dayEntries = entries
         }
         model.getLastEntry().observe(viewLifecycleOwner) { entry ->
             if (entry.id != -1L) {
+                val profile = model.getProfile().value!!
                 val position = calcDayDifference(profile.creationDate, entry.date!!)
                 adapter.notifyItemChanged(position)
             }
         }
+        model.getProfile().observe(viewLifecycleOwner) { profile ->
+            adapter.profile = profile
+        }
 
+        adapter = ColorRectAdapter(model.getProfile().value!!)
         grid = view.findViewById(R.id.colorGrid)
         grid!!.adapter = adapter
 
@@ -57,13 +59,5 @@ class ColorGridFragment : Fragment() {
             val dayEntries = model.getEntriesByDay().value
             Toast.makeText(context, "Day: $day (${dayEntries?.get(day)?.size})", Toast.LENGTH_SHORT).show()
         }
-    }
-
-    override fun onAttach(context: Context) {
-        super.onAttach(context)
-        db = DatabaseHelper(context)
-        profile = db.queryProfile(1)
-        adapter = ColorRectAdapter(profile)
-        grid?.adapter = adapter
     }
 }
