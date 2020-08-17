@@ -12,6 +12,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.graphics.blue
 import androidx.core.graphics.green
 import androidx.core.graphics.red
+import kotlin.math.abs
 
 fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
     val hsv1 = floatArrayOf(0f, 0f, 0f)
@@ -19,8 +20,16 @@ fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
     val hsv2 = floatArrayOf(0f, 0f, 0f)
     Color.RGBToHSV(endColor.red, endColor.green, endColor.blue, hsv2)
 
-    // return Color.rgb((x * 255).roundToInt(), 0, 0)
-    val h = (1.0f - t) * hsv1[0] + t * hsv2[0]
+    // TODO try gamma 2.2 space?
+    // Hue value is in [0, 360]. The interpolation must take the shortest route -> modulo ...
+    if (abs(hsv2[0] - hsv1[0]) > 180) {
+        if (hsv1[0] in 0f..180f) {
+            hsv2[0] -= 360f
+        } else {
+            hsv1[0] -= 360f
+        }
+    }
+    val h = ((1.0f - t) * hsv1[0] + t * hsv2[0] + 720f).rem(360f)  // Work-around for negative modulo ...
     val s = (1.0f - t) * hsv1[1] + t * hsv2[1]
     val v = (1.0f - t) * hsv1[2] + t * hsv2[2]
     val hsv = floatArrayOf(h, s, v)
