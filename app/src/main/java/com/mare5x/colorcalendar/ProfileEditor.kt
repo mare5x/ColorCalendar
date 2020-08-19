@@ -1,14 +1,23 @@
 package com.mare5x.colorcalendar
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.EditText
 import androidx.fragment.app.DialogFragment
 
 class ProfileEditorDialogFragment : DialogFragment() {
+    interface ProfileEditorListener {
+        fun onProfileConfirm(name: String, minColor: Int, maxColor: Int, prefColor: Int)
+    }
+
     private lateinit var minColorPicker: ColorPickerBar
     private lateinit var maxColorPicker: ColorPickerBar
+
+    private var listener: ProfileEditorListener? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -36,6 +45,24 @@ class ProfileEditorDialogFragment : DialogFragment() {
         maxColorPicker.onProgressChanged = { value, color ->
             profileColorsBar.setColors(minColorPicker.getColor(), color)
         }
+
+        val nameEditor = view.findViewById<EditText>(R.id.profileNameEdit)
+
+        val cancelButton = view.findViewById<Button>(R.id.cancelButton)
+        cancelButton.setOnClickListener {
+            if (showsDialog)
+                dismiss()
+        }
+
+        val confirmButton = view.findViewById<Button>(R.id.confirmButton)
+        confirmButton.setOnClickListener {
+            listener?.onProfileConfirm(nameEditor.text.toString(),
+                minColorPicker.getColor(),
+                maxColorPicker.getColor(),
+                profileColorsBar.getColor())
+            if (showsDialog)
+                dismiss()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -57,6 +84,11 @@ class ProfileEditorDialogFragment : DialogFragment() {
                 maxColorPicker.setNormProgress(getFloat(STATE_MAX_COLOR))
             }
         }
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as? ProfileEditorListener
     }
 
     companion object {

@@ -3,16 +3,17 @@ package com.mare5x.colorcalendar
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.observe
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 
-class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener {
+class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener, ProfileEditorDialogFragment.ProfileEditorListener {
 
     private lateinit var db: DatabaseHelper
     private val gridViewModel: ColorGridViewModel by viewModels { ColorGridViewModelFactory(db) }
+    private val profilesViewModel: ProfilesViewModel by viewModels { ProfilesViewModelFactory(db) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,6 +26,11 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
             val dialog = ColorPickerDialogFragment()
             dialog.show(supportFragmentManager, "colorPicker")
+        }
+
+        profilesViewModel.getProfiles().observe(this) { profiles ->
+            if (profiles.isNotEmpty())
+                gridViewModel.setProfile(profiles.last())
         }
     }
 
@@ -54,6 +60,14 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
     }
 
     override fun onColorCancel(value: Float) { }
+
+    override fun onProfileConfirm(name: String, minColor: Int, maxColor: Int, prefColor: Int) {
+        profilesViewModel.insertProfile(ProfileEntry(
+            name = name,
+            minColor = minColor,
+            maxColor = maxColor
+        ))
+    }
 
     companion object {
         private const val TAG = "MainActivity"
