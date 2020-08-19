@@ -14,6 +14,8 @@ import androidx.fragment.app.activityViewModels
 // Use either as a dialog or as a fragment.
 // Note: Dialog's use wrap_content for layout width and height ...
 class ColorPickerDialogFragment : DialogFragment() {
+    // NOTE: the parent must implement this interface ...
+    // Using function callbacks doesn't work because of configuration changes ...!
     interface ColorPickerListener {
         fun onColorConfirm(value: Float)
         fun onColorCancel(value: Float)

@@ -3,6 +3,7 @@ package com.mare5x.colorcalendar
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -39,6 +40,11 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
             R.id.action_settings -> true
+            R.id.action_profile -> {
+                val dialog = ProfileEditorDialogFragment()
+                dialog.show(supportFragmentManager, "profileEditor")
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }

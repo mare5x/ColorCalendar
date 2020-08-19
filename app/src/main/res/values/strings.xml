@@ -12,4 +12,7 @@
 
     <string name="cancel_button">Cancel</string>
     <string name="confirm_button">Confirm</string>
+
+    <string name="profile_name">Name</string>
+
 </resources>
