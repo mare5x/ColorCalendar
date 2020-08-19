@@ -1,12 +1,14 @@
 package com.mare5x.colorcalendar
 
 import android.os.Bundle
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import androidx.constraintlayout.widget.ConstraintLayout
+import android.widget.TextView
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.observe
 import androidx.navigation.fragment.findNavController
 
 class SecondFragment : Fragment() {
@@ -25,5 +27,16 @@ class SecondFragment : Fragment() {
         view.findViewById<Button>(R.id.button_second).setOnClickListener {
             findNavController().navigate(R.id.action_SecondFragment_to_FirstFragment)
         }
+
+        val profilesModel: ProfilesViewModel by activityViewModels()
+        val tmpText = view.findViewById<TextView>(R.id.tmpText)
+        profilesModel.getProfiles().observe(viewLifecycleOwner) { profiles ->
+            tmpText.text = profiles.joinToString { profile ->
+                profile.toString()
+            }
+        }
+        tmpText.text = profilesModel.getProfiles().value?.joinToString { profile ->
+            profile.toString()
+        } ?: ":("
     }
 }
