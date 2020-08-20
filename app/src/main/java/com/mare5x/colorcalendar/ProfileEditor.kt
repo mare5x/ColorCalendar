@@ -1,6 +1,7 @@
 package com.mare5x.colorcalendar
 
 import android.content.Context
+import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,6 +13,8 @@ import androidx.fragment.app.DialogFragment
 class ProfileEditorDialogFragment : DialogFragment() {
     interface ProfileEditorListener {
         fun onProfileConfirm(name: String, minColor: Int, maxColor: Int, prefColor: Int)
+        fun onProfileColorChanged(color: Int)
+        fun onProfileDismiss()
     }
 
     private lateinit var minColorPicker: ColorPickerBar
@@ -39,11 +42,17 @@ class ProfileEditorDialogFragment : DialogFragment() {
         val profileColorsBar = view.findViewById<ColorSeekBar>(R.id.profileColorsBar)
         profileColorsBar.setColors(minColorPicker.getColor(), maxColorPicker.getColor())
 
-        minColorPicker.onProgressChanged = { value, color ->
+        minColorPicker.onValueChanged = { _, color ->
             profileColorsBar.setColors(color, maxColorPicker.getColor())
+            listener?.onProfileColorChanged(profileColorsBar.getColor())
         }
-        maxColorPicker.onProgressChanged = { value, color ->
+        maxColorPicker.onValueChanged = { _, color ->
             profileColorsBar.setColors(minColorPicker.getColor(), color)
+            listener?.onProfileColorChanged(profileColorsBar.getColor())
+        }
+
+        profileColorsBar.onValueChanged = { _, color ->
+            listener?.onProfileColorChanged(color)
         }
 
         val nameEditor = view.findViewById<EditText>(R.id.profileNameEdit)
@@ -63,6 +72,12 @@ class ProfileEditorDialogFragment : DialogFragment() {
             if (showsDialog)
                 dismiss()
         }
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        super.onDismiss(dialog)
+
+        listener?.onProfileDismiss()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

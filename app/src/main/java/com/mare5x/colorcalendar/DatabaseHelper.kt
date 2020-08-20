@@ -27,6 +27,7 @@ private object DatabaseContract {
         const val PROFILE_NAME = "name"
         const val MIN_COLOR = "min_color"
         const val MAX_COLOR = "max_color"
+        const val PREF_COLOR = "pref_color"
         const val CREATION_DATE = "creation_date"
 
         const val DB_CREATE = """
@@ -35,6 +36,7 @@ private object DatabaseContract {
                 $PROFILE_NAME TEXT NOT NULL,
                 $MIN_COLOR INTEGER NOT NULL,
                 $MAX_COLOR INTEGER NOT NULL,
+                $PREF_COLOR INTEGER NOT NULL,
                 $CREATION_DATE TEXT NOT NULL
             );
         """
@@ -60,9 +62,21 @@ private object DatabaseContract {
 }
 
 
-data class ProfileEntry(var id: Long = -1, var name: String = "null", var minColor: Int = 0, var maxColor: Int = 0, var creationDate: Date = Date())
+data class ProfileEntry(
+    var id: Long = -1,
+    var name: String = "null",
+    var minColor: Int = 0,
+    var maxColor: Int = 0,
+    var prefColor: Int = 0,
+    var creationDate: Date = Date()
+)
 
-data class Entry(var id: Long = -1, var profile: ProfileEntry? = null, var date: Date? = null, var value: Float = 0f)
+data class Entry(
+    var id: Long = -1,
+    var profile: ProfileEntry? = null,
+    var date: Date? = null,
+    var value: Float = 0f
+)
 
 
 class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
@@ -98,6 +112,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             put(profileDB.PROFILE_NAME, profile.name)
             put(profileDB.MIN_COLOR, profile.minColor)
             put(profileDB.MAX_COLOR, profile.maxColor)
+            put(profileDB.PREF_COLOR, profile.prefColor)
             put(profileDB.CREATION_DATE, DatabaseContract.DATE_FORMAT.format(profile.creationDate))
         }
 
@@ -154,12 +169,15 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
                 return ProfileEntry()
             }
 
-            profile.id = id
-            profile.name = cursor.getString(cursor.getColumnIndex(profileDB.PROFILE_NAME))
-            profile.minColor = cursor.getInt(cursor.getColumnIndex(profileDB.MIN_COLOR))
-            profile.maxColor = cursor.getInt(cursor.getColumnIndex(profileDB.MAX_COLOR))
-            profile.creationDate = DatabaseContract.DATE_FORMAT.parse(
-                cursor.getString(cursor.getColumnIndex(profileDB.CREATION_DATE)))
+            with(cursor) {
+                profile.id = id
+                profile.name = getString(getColumnIndex(profileDB.PROFILE_NAME))
+                profile.minColor = getInt(getColumnIndex(profileDB.MIN_COLOR))
+                profile.maxColor = getInt(getColumnIndex(profileDB.MAX_COLOR))
+                profile.prefColor = getInt(getColumnIndex(profileDB.PREF_COLOR))
+                profile.creationDate = DatabaseContract.DATE_FORMAT.parse(
+                    getString(getColumnIndex(profileDB.CREATION_DATE)))
+            }
         } catch (e: Exception) {
             Log.e(TAG, "queryProfile: ", e)
         } finally {
@@ -185,6 +203,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
                 profile.name = getString(getColumnIndex(profileDB.PROFILE_NAME))
                 profile.minColor = getInt(getColumnIndex(profileDB.MIN_COLOR))
                 profile.maxColor = getInt(getColumnIndex(profileDB.MAX_COLOR))
+                profile.prefColor = getInt(getColumnIndex(profileDB.PREF_COLOR))
                 profile.creationDate = DatabaseContract.DATE_FORMAT.parse(getString(getColumnIndex(profileDB.CREATION_DATE)))
                 moveToNext()
             }

@@ -1,5 +1,8 @@
 package com.mare5x.colorcalendar
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -31,6 +34,10 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         profilesViewModel.getProfiles().observe(this) { profiles ->
             if (profiles.isNotEmpty())
                 gridViewModel.setProfile(profiles.last())
+        }
+
+        gridViewModel.getProfile().observe(this) { profile ->
+            setUIColor(profile.prefColor)
         }
     }
 
@@ -65,8 +72,26 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         profilesViewModel.insertProfile(ProfileEntry(
             name = name,
             minColor = minColor,
-            maxColor = maxColor
+            maxColor = maxColor,
+            prefColor = prefColor
         ))
+    }
+
+    override fun onProfileColorChanged(color: Int) = setUIColor(color)
+
+    fun setUIColor(color: Int) {
+        supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val hsv = floatArrayOf(0f, 0f, 0f)
+            Color.colorToHSV(color, hsv)
+            hsv[2] *= 0.8f
+            window.statusBarColor = Color.HSVToColor(hsv)
+        }
+    }
+
+    override fun onProfileDismiss() {
+        // Restore color
+        setUIColor(gridViewModel.getProfile().value!!.prefColor)
     }
 
     companion object {

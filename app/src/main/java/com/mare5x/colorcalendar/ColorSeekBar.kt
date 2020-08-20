@@ -54,12 +54,22 @@ class ColorSeekBar : androidx.appcompat.widget.AppCompatSeekBar {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-    var startColor: Int = Color.GRAY
-    var endColor: Int = Color.GRAY
-    var fullHue: Boolean = false
+    private var startColor: Int = Color.GRAY
+    private var endColor: Int = Color.GRAY
+    private var fullHue: Boolean = false
+
+    var onValueChanged: (value: Float, color: Int) -> Unit = { _, _ -> }
 
     init {
         updateGradientBackground()
+
+        setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                onValueChanged(getNormProgress(), getColor())
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar) {}
+        })
     }
 
     private fun updateGradientBackground() {
@@ -113,26 +123,22 @@ class ColorPickerBar : ConstraintLayout {
     private var colorRect: ColorRect
     private var colorBar: ColorSeekBar
 
-    var onProgressChanged: (value: Float, color: Int) -> Unit = { _, _ ->  }
+    var onValueChanged: (value: Float, color: Int) -> Unit = { _, _ ->  }
 
     init {
         LayoutInflater.from(context).inflate(R.layout.color_picker_view, this, true)
 
         colorRect = findViewById(R.id.colorRect)
         colorBar = findViewById(R.id.colorSeekBar)
-        colorBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                updateColorRect()
-                onProgressChanged(getNormProgress(), getColor())
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar) {}
-        })
+        colorBar.onValueChanged = { value, color ->
+            updateColorRect()
+            onValueChanged(value, color)
+        }
 
         updateColorRect()
     }
 
-    fun updateColorRect() {
+    private fun updateColorRect() {
         colorRect.color = colorBar.getColor()
     }
 
