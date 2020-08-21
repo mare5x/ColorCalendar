@@ -94,45 +94,6 @@ class ColorGridViewModelFactory(private val db: DatabaseHelper) : ViewModelProvi
     }
 }
 
-typealias ProfileList = MutableList<ProfileEntry>
-
-class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
-    private val profilesData = MutableLiveData<ProfileList>(mutableListOf())
-
-    init {
-        fetchProfiles()
-    }
-
-    fun getProfiles() = profilesData
-
-    fun fetchProfiles() {
-        viewModelScope.launch {
-            val profiles = db.queryAllProfiles()
-            profilesData.postValue(profiles.toMutableList())
-        }
-    }
-
-    fun insertProfile(profile: ProfileEntry) {
-        viewModelScope.launch {
-            profile.creationDate = Date()
-            profile.id = db.insertProfile(profile)
-            if (profile.id != 1L) {
-                profilesData.value!!.add(profile)
-                // Hack to notify profilesData observers
-                profilesData.postValue(profilesData.value)
-            }
-        }
-    }
-}
-
-class ProfilesViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {
-
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
-        return ProfilesViewModel(db) as T
-    }
-}
-
 class ColorRectAdapter(profile: ProfileEntry) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
 

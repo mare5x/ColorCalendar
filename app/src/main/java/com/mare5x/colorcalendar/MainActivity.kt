@@ -1,5 +1,8 @@
 package com.mare5x.colorcalendar
 
+import ProfileSpinnerAdapter
+import ProfilesViewModel
+import ProfilesViewModelFactory
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
@@ -44,13 +47,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         actionBar?.setDisplayShowTitleEnabled(false)
 
         val profileSpinner = findViewById<Spinner>(R.id.profileSpinner)
-        val profileSpinnerAdapter = ArrayAdapter<ProfileEntry>(
-            actionBar?.themedContext ?: this,
-            R.layout.profile_spinner_item,
-            R.id.profileText,
-            profilesViewModel.getProfiles().value!!
-        )
-        profileSpinnerAdapter.setDropDownViewResource(R.layout.profile_spinner_dropdown_item)
+
+        val profileSpinnerAdapter = ProfileSpinnerAdapter(actionBar?.themedContext ?: this)
         // https://developer.android.com/reference/android/widget/Spinner#setAdapter(android.widget.SpinnerAdapter)
         // Popup theme!
         profileSpinner.adapter = profileSpinnerAdapter
