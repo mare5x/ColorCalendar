@@ -16,4 +16,8 @@
 
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
+    <style name="SpinnerBarTitle" parent="TextAppearance.AppCompat.Widget.ActionBar.Title" />
+
+    <style name="SpinnerBarDropDownItem" parent="ThemeOverlay.AppCompat.Light">
+    </style>
 </resources>

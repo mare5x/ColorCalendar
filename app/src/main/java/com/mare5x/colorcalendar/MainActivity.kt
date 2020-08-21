@@ -4,8 +4,13 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.observe
@@ -31,13 +36,44 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
             dialog.show(supportFragmentManager, "colorPicker")
         }
 
+        // Set up a spinner instead of the title in the app bar.
+        // The spinner is used to select the currently displayed profile.
+        val actionBar = supportActionBar
+        actionBar?.setCustomView(R.layout.toolbar_profile_spinner)
+        actionBar?.setDisplayShowCustomEnabled(true)
+        actionBar?.setDisplayShowTitleEnabled(false)
+
+        val profileSpinner = findViewById<Spinner>(R.id.profileSpinner)
+        val profileSpinnerAdapter = ArrayAdapter<ProfileEntry>(
+            actionBar?.themedContext ?: this,
+            R.layout.profile_spinner_item,
+            R.id.profileText,
+            profilesViewModel.getProfiles().value!!
+        )
+        profileSpinnerAdapter.setDropDownViewResource(R.layout.profile_spinner_dropdown_item)
+        // https://developer.android.com/reference/android/widget/Spinner#setAdapter(android.widget.SpinnerAdapter)
+        // Popup theme!
+        profileSpinner.adapter = profileSpinnerAdapter
+        profileSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                changeProfile(parent.getItemAtPosition(position) as ProfileEntry)
+            }
+        }
+
         profilesViewModel.getProfiles().observe(this) { profiles ->
-            if (profiles.isNotEmpty())
-                gridViewModel.setProfile(profiles.last())
+            if (profiles.isNotEmpty()) {
+                changeProfile(profiles.last())
+                profileSpinnerAdapter.clear()
+                profileSpinnerAdapter.addAll(profiles)
+                profileSpinner.setSelection(profileSpinnerAdapter.getPosition(profiles.last()))
+            }
         }
 
         gridViewModel.getProfile().observe(this) { profile ->
             setUIColor(profile.prefColor)
+            // profileSpinner.setSelection(profileSpinnerAdapter.getPosition(profile))
         }
     }
 
@@ -92,6 +128,10 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
     override fun onProfileDismiss() {
         // Restore color
         setUIColor(gridViewModel.getProfile().value!!.prefColor)
+    }
+
+    fun changeProfile(profile: ProfileEntry) {
+        gridViewModel.setProfile(profile)
     }
 
     companion object {
