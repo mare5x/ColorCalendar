@@ -34,12 +34,6 @@ class ColorGridFragment : Fragment() {
         // grid (RecyclerView).
         // The view model is scoped to the fragment's lifecycle.
         val gridModel: ColorGridViewModel by viewModels { ColorGridViewModelFactory(DatabaseHelper(view.context)) }
-        gridModel.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
-            adapter.dayEntries = entries
-        }
-        gridModel.getProfile().observe(viewLifecycleOwner) { profile ->
-            adapter.profile = profile
-        }
 
         // Fragment created using companion 'create' function with bundle arguments (profile id).
         val profileId = requireArguments().getLong(PROFILE_ID_KEY)
@@ -56,15 +50,22 @@ class ColorGridFragment : Fragment() {
 
         val mainModel: MainViewModel by activityViewModels()
         mainModel.getInsertedEntry().observe(viewLifecycleOwner) { entry ->
-            if (entry.id != -1L) {
+            if (entry.profile!!.id == profileId && entry.id != -1L) {
                 val profile = gridModel.getProfile().value!!
                 val position = calcDayDifference(profile.creationDate, entry.date!!)
-                val entriesByDayData = gridModel.getEntriesByDay().value!!
+                val entriesByDayData = adapter.dayEntries
                 entriesByDayData[position].add(entry)
                 // TODO ensure day list is big enough (midnight ...)
 
                 adapter.notifyItemChanged(position)
             }
+        }
+
+        gridModel.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
+            adapter.dayEntries = entries
+        }
+        gridModel.getProfile().observe(viewLifecycleOwner) { profile ->
+            adapter.profile = profile
         }
 
         adapter.clickListener = { day ->
