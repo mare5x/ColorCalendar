@@ -21,7 +21,6 @@ class ColorPickerDialogFragment : DialogFragment() {
         fun onColorCancel(value: Float)
     }
 
-    private val gridViewModel: ColorGridViewModel by activityViewModels()
     private var listener: ColorPickerListener? = null
 
     override fun onCreateView(
@@ -36,7 +35,8 @@ class ColorPickerDialogFragment : DialogFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorPickerBar)
-        val profile = gridViewModel.getProfile().value
+        val mainModel: MainViewModel by activityViewModels()
+        val profile = mainModel.getCurrentProfile().value
         if (profile != null)
             colorPickerBar.setColors(profile.minColor, profile.maxColor)
 

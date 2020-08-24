@@ -1,5 +1,6 @@
 package com.mare5x.colorcalendar
 
+import ProfileFragmentAdapter
 import ProfileSpinnerAdapter
 import ProfilesViewModel
 import ProfilesViewModelFactory
@@ -12,19 +13,64 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Spinner
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.observe
+import androidx.lifecycle.*
+import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.coroutines.launch
+import java.util.*
+
+
+class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
+    private val currentProfile = MutableLiveData<ProfileEntry>()
+    private val insertedProfile = MutableLiveData<ProfileEntry>()
+    private val insertedEntry = MutableLiveData<Entry>()
+
+    fun getCurrentProfile() = currentProfile
+    fun setCurrentProfile(profile: ProfileEntry) {
+        currentProfile.postValue(profile)
+    }
+
+    fun getInsertedProfile() = insertedProfile
+    fun insertProfile(profile: ProfileEntry) {
+        viewModelScope.launch {
+            profile.creationDate = Date()
+            profile.id = db.insertProfile(profile)
+            insertedProfile.postValue(profile)
+        }
+    }
+
+    fun getInsertedEntry() = insertedEntry
+    fun insertEntry(entry: Entry) {
+        viewModelScope.launch {
+            val profile = currentProfile.value!!
+            entry.profile = profile
+            entry.date = Date()
+            entry.id = db.insertEntry(entry)
+            insertedEntry.postValue(entry)
+        }
+    }
+}
+
+class MainViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+        return MainViewModel(db) as T
+    }
+}
 
 
 class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener, ProfileEditorDialogFragment.ProfileEditorListener {
 
     private lateinit var db: DatabaseHelper
-    private val gridViewModel: ColorGridViewModel by viewModels { ColorGridViewModelFactory(db) }
+    private lateinit var viewPager: ViewPager2
+
+    private val mainViewModel: MainViewModel by viewModels { MainViewModelFactory(db) }
     private val profilesViewModel: ProfilesViewModel by viewModels { ProfilesViewModelFactory(db) }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,7 +78,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         setSupportActionBar(findViewById(R.id.toolbar))
 
         db = DatabaseHelper(this)
-        gridViewModel.setProfile(1)
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
             val dialog = ColorPickerDialogFragment()
@@ -60,18 +105,39 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
             }
         }
 
+        // Set up swipe page viewer for swiping between profiles.
+        viewPager = findViewById(R.id.pager)
+        val profileFragmentAdapter = ProfileFragmentAdapter(this,
+            profilesViewModel.getProfiles().value ?: emptyList())
+        viewPager.adapter = profileFragmentAdapter
+        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                changeProfile(profilesViewModel.getProfile(position))
+            }
+        })
+
+        mainViewModel.getInsertedProfile().observe(this) { profile ->
+            profilesViewModel.addProfile(profile)
+            profileSpinnerAdapter.add(profile)
+            changeProfile(profile)
+        }
+
         profilesViewModel.getProfiles().observe(this) { profiles ->
             if (profiles.isNotEmpty()) {
-                changeProfile(profiles.last())
                 profileSpinnerAdapter.clear()
                 profileSpinnerAdapter.addAll(profiles)
-                profileSpinner.setSelection(profileSpinnerAdapter.getPosition(profiles.last()))
+                profileSpinnerAdapter.notifyDataSetChanged()
+
+                profileFragmentAdapter.profiles = profiles
+                profileFragmentAdapter.notifyDataSetChanged()
             }
         }
 
-        gridViewModel.getProfile().observe(this) { profile ->
-            setUIColor(profile.prefColor)
-            // profileSpinner.setSelection(profileSpinnerAdapter.getPosition(profile))
+        mainViewModel.getCurrentProfile().observe(this) { profile ->
+            onProfileChanged(profile)
+
+            profileSpinner.setSelection(profileSpinnerAdapter.getPosition(profile))
+            viewPager.setCurrentItem(profileFragmentAdapter.profiles.indexOf(profile))
         }
     }
 
@@ -97,13 +163,13 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
     }
 
     override fun onColorConfirm(value: Float) {
-        gridViewModel.insertEntry(Entry(value = value))
+        mainViewModel.insertEntry(Entry(value = value))
     }
 
     override fun onColorCancel(value: Float) { }
 
     override fun onProfileConfirm(name: String, minColor: Int, maxColor: Int, prefColor: Int) {
-        profilesViewModel.insertProfile(ProfileEntry(
+        mainViewModel.insertProfile(ProfileEntry(
             name = name,
             minColor = minColor,
             maxColor = maxColor,
@@ -125,11 +191,15 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
 
     override fun onProfileDismiss() {
         // Restore color
-        setUIColor(gridViewModel.getProfile().value!!.prefColor)
+        setUIColor(mainViewModel.getCurrentProfile().value!!.prefColor)
     }
 
     fun changeProfile(profile: ProfileEntry) {
-        gridViewModel.setProfile(profile)
+        mainViewModel.setCurrentProfile(profile)
+    }
+
+    fun onProfileChanged(profile: ProfileEntry) {
+        setUIColor(profile.prefColor)
     }
 
     companion object {

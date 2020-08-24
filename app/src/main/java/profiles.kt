@@ -3,15 +3,18 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.TextView
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.viewpager2.adapter.FragmentStateAdapter
+import com.mare5x.colorcalendar.ColorGridFragment
 import com.mare5x.colorcalendar.DatabaseHelper
 import com.mare5x.colorcalendar.ProfileEntry
 import com.mare5x.colorcalendar.R
 import kotlinx.coroutines.launch
-import java.util.*
 
 typealias ProfileList = MutableList<ProfileEntry>
 
@@ -31,16 +34,12 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
         }
     }
 
-    fun insertProfile(profile: ProfileEntry) {
-        viewModelScope.launch {
-            profile.creationDate = Date()
-            profile.id = db.insertProfile(profile)
-            if (profile.id != 1L) {
-                profilesData.value!!.add(profile)
-                // Hack to notify profilesData observers
-                profilesData.postValue(profilesData.value)
-            }
-        }
+    fun getProfile(position: Int): ProfileEntry {
+        return profilesData.value!!.get(position)
+    }
+
+    fun addProfile(profile: ProfileEntry) {
+        profilesData.value?.add(profile)
     }
 }
 
@@ -53,6 +52,7 @@ class ProfilesViewModelFactory(private val db: DatabaseHelper) : ViewModelProvid
 }
 
 
+// TODO use BaseAdapter ...
 class ProfileSpinnerAdapter(context: Context) :
     ArrayAdapter<ProfileEntry>(context, R.layout.profile_spinner_item, R.id.profileText)
 {
@@ -74,5 +74,29 @@ class ProfileSpinnerAdapter(context: Context) :
         val profile = getItem(position) as ProfileEntry
         text.text = profile.name
         return view
+    }
+}
+
+
+class ProfileFragmentAdapter(
+    parent: FragmentActivity,
+    var profiles: List<ProfileEntry>
+) : FragmentStateAdapter(parent) {
+
+    override fun getItemId(position: Int): Long {
+        return profiles[position].id
+    }
+
+    override fun containsItem(itemId: Long): Boolean {
+        return profiles.any { p -> p.id == itemId }
+    }
+
+    override fun getItemCount(): Int {
+        return profiles.size
+    }
+
+    override fun createFragment(position: Int): Fragment {
+        val profile = profiles[position]
+        return ColorGridFragment.create(profile)
     }
 }

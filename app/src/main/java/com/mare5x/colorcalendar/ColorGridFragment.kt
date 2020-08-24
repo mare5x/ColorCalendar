@@ -8,11 +8,12 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.observe
 import androidx.navigation.fragment.findNavController
 
 class ColorGridFragment : Fragment() {
-    private var grid: ColorGrid? = null
+    private lateinit var grid: ColorGrid
     private lateinit var adapter: ColorRectAdapter
 
     override fun onCreateView(
@@ -31,33 +32,54 @@ class ColorGridFragment : Fragment() {
         // a separate coroutine. The view model's live data is observed for changes, which notifies
         // the grid adapter. The adapter is given the data and creates the views for
         // grid (RecyclerView).
-        // The view model is owned by the parent activity.
-        val model: ColorGridViewModel by activityViewModels()
-        model.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
+        // The view model is scoped to the fragment's lifecycle.
+        val gridModel: ColorGridViewModel by viewModels { ColorGridViewModelFactory(DatabaseHelper(view.context)) }
+        gridModel.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
             adapter.dayEntries = entries
         }
-        model.getLastEntry().observe(viewLifecycleOwner) { entry ->
-            if (entry.id != -1L) {
-                val profile = model.getProfile().value!!
-                val position = calcDayDifference(profile.creationDate, entry.date!!)
-                adapter.notifyItemChanged(position)
-            }
-        }
-        model.getProfile().observe(viewLifecycleOwner) { profile ->
+        gridModel.getProfile().observe(viewLifecycleOwner) { profile ->
             adapter.profile = profile
         }
 
-        adapter = ColorRectAdapter(model.getProfile().value!!)
-        grid = view.findViewById(R.id.colorGrid)
-        grid!!.adapter = adapter
+        // Fragment created using companion 'create' function with bundle arguments (profile id).
+        val profileId = requireArguments().getLong(PROFILE_ID_KEY)
+        gridModel.setProfile(profileId)
 
+        adapter = ColorRectAdapter(gridModel.getProfile().value!!)
+        grid = view.findViewById(R.id.colorGrid)
+        grid.adapter = adapter
+
+        // TODO
         view.findViewById<Button>(R.id.button_first).setOnClickListener {
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
 
+        val mainModel: MainViewModel by activityViewModels()
+        mainModel.getInsertedEntry().observe(viewLifecycleOwner) { entry ->
+            if (entry.id != -1L) {
+                val profile = gridModel.getProfile().value!!
+                val position = calcDayDifference(profile.creationDate, entry.date!!)
+                val entriesByDayData = gridModel.getEntriesByDay().value!!
+                entriesByDayData[position].add(entry)
+                // TODO ensure day list is big enough (midnight ...)
+
+                adapter.notifyItemChanged(position)
+            }
+        }
+
         adapter.clickListener = { day ->
-            val dayEntries = model.getEntriesByDay().value
-            Toast.makeText(context, "Day: $day (${dayEntries?.get(day)?.size})", Toast.LENGTH_SHORT).show()
+            val dayEntries = adapter.dayEntries
+            Toast.makeText(context, "Day: $day (${dayEntries[day].size})", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    companion object {
+        const val PROFILE_ID_KEY = "PROFILE_ID"
+
+        fun create(profile: ProfileEntry): ColorGridFragment {
+            val fragment = ColorGridFragment()
+            fragment.arguments = Bundle().apply { putLong(PROFILE_ID_KEY, profile.id) }
+            return fragment
         }
     }
 }

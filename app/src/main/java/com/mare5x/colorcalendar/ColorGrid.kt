@@ -38,13 +38,9 @@ typealias EntryList = Array<MutableList<Entry>>
 
 class ColorGridViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val entriesByDayData = MutableLiveData<EntryList>()
-    private val lastEntryData = MutableLiveData<Entry>()
     private val profileData = MutableLiveData<ProfileEntry>()
 
     fun getEntriesByDay() = entriesByDayData
-
-    fun getLastEntry() = lastEntryData
-
     fun getProfile() = profileData
 
     fun setProfile(profile: ProfileEntry) {
@@ -71,19 +67,6 @@ class ColorGridViewModel(private val db: DatabaseHelper) : ViewModel() {
             entriesByDayData.postValue(dayEntries)
         }
     }
-
-    fun insertEntry(entry: Entry) {
-        val profile = profileData.value!!
-        entry.profile = profile
-        entry.date = Date()
-        entry.id = db.insertEntry(entry)
-        if (entry.id != -1L) {
-            val day = calcDayDifference(profile.creationDate, entry.date!!)
-            entriesByDayData.value!![day].add(entry)
-            // TODO ensure day list is big enough (midnight ...)
-        }
-        lastEntryData.postValue(entry)
-    }
 }
 
 class ColorGridViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {
@@ -94,7 +77,7 @@ class ColorGridViewModelFactory(private val db: DatabaseHelper) : ViewModelProvi
     }
 }
 
-class ColorRectAdapter(profile: ProfileEntry) :
+class ColorRectAdapter(var profile: ProfileEntry) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
 
     class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
@@ -107,11 +90,6 @@ class ColorRectAdapter(profile: ProfileEntry) :
             rect = v.findViewById(R.id.colorRect)
         }
     }
-
-    var profile: ProfileEntry = profile
-        set(value) {
-            field = value
-        }
 
     // Refers to the list in the view model.
     var dayEntries: EntryList = Array(getProfileDayAge(profile)) { mutableListOf<Entry>() }
