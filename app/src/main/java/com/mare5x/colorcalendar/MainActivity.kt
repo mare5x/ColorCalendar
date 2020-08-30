@@ -129,6 +129,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         mainViewModel.getInsertedProfile().observe(this) { profile ->
             profilesViewModel.addProfile(profile)
             profileSpinnerAdapter.add(profile)
+            val position = profilesViewModel.getPosition(profile)
+            profileFragmentAdapter.notifyItemInserted(position)
+
             changeProfile(profile)
         }
 
@@ -138,7 +141,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
             profileSpinnerAdapter.remove(profile)
             profileFragmentAdapter.notifyItemRemoved(index)
 
-            val newProfile = profilesViewModel.getProfile(index % profilesViewModel.getSize())
+            val newProfile = profilesViewModel.getProfile(Math.max(0, index - 1))
             changeProfile(newProfile)
         }
 
