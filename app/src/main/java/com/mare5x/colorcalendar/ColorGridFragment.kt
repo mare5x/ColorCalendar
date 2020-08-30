@@ -4,13 +4,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.observe
-import androidx.navigation.fragment.findNavController
 
 class ColorGridFragment : Fragment() {
     private lateinit var grid: ColorGrid
@@ -42,11 +40,6 @@ class ColorGridFragment : Fragment() {
         adapter = ColorRectAdapter(gridModel.getProfile().value!!)
         grid = view.findViewById(R.id.colorGrid)
         grid.adapter = adapter
-
-        // TODO
-        view.findViewById<Button>(R.id.button_first).setOnClickListener {
-            findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
-        }
 
         val mainModel: MainViewModel by activityViewModels()
         mainModel.getInsertedEntry().observe(viewLifecycleOwner) { entry ->
