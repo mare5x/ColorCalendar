@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.*
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -35,7 +36,7 @@ class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
 
     fun getInsertedProfile() = insertedProfile
     fun insertProfile(profile: ProfileEntry) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             profile.creationDate = Date()
             profile.id = db.insertProfile(profile)
             insertedProfile.postValue(profile)
@@ -44,7 +45,7 @@ class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
 
     fun getInsertedEntry() = insertedEntry
     fun insertEntry(entry: Entry) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val profile = currentProfile.value!!
             entry.profile = profile
             entry.date = Date()

@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import androidx.lifecycle.*
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -53,7 +54,7 @@ class ColorGridViewModel(private val db: DatabaseHelper) : ViewModel() {
     }
 
     private fun fetchGridEntries(profile: ProfileEntry) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val entries = db.queryAllEntries(profile)
 
             val dayEntries = EntryList(getProfileDayAge(profile)) { mutableListOf() }
@@ -92,7 +93,7 @@ class ColorRectAdapter(var profile: ProfileEntry) :
     }
 
     // Refers to the list in the view model.
-    var dayEntries: EntryList = Array(getProfileDayAge(profile)) { mutableListOf<Entry>() }
+    var dayEntries: EntryList = emptyArray()
         set(value) {
             field = value
             notifyDataSetChanged()
@@ -101,6 +102,8 @@ class ColorRectAdapter(var profile: ProfileEntry) :
     var clickListener: (position: Int) -> Unit = { }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        // TODO layout inflation is the bottleneck when first populating the grid ...
+        // The problem is mitigated by displaying fewer columns
         val v = LayoutInflater.from(parent.context).inflate(R.layout.color_grid_item, parent, false)
         return ViewHolder(v).also { h -> h.clickListener = clickListener }
     }
@@ -125,6 +128,6 @@ class ColorGrid : RecyclerView {
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
     init {
-        layoutManager = GridLayoutManager(context, 7)
+        layoutManager = GridLayoutManager(context, 14)
     }
 }

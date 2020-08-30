@@ -14,6 +14,7 @@ import com.mare5x.colorcalendar.ColorGridFragment
 import com.mare5x.colorcalendar.DatabaseHelper
 import com.mare5x.colorcalendar.ProfileEntry
 import com.mare5x.colorcalendar.R
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 typealias ProfileList = MutableList<ProfileEntry>
@@ -28,7 +29,7 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
     fun getProfiles() = profilesData
 
     private fun fetchProfiles() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val profiles = db.queryAllProfiles()
             profilesData.postValue(profiles.toMutableList())
         }
