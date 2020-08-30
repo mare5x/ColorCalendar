@@ -1,8 +1,12 @@
+import android.app.AlertDialog
+import android.app.Dialog
 import android.content.Context
+import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.TextView
+import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.MutableLiveData
@@ -10,10 +14,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.viewpager2.adapter.FragmentStateAdapter
-import com.mare5x.colorcalendar.ColorGridFragment
-import com.mare5x.colorcalendar.DatabaseHelper
-import com.mare5x.colorcalendar.ProfileEntry
-import com.mare5x.colorcalendar.R
+import com.mare5x.colorcalendar.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -35,12 +36,24 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
         }
     }
 
+    fun getSize() = profilesData.value?.size ?: 0
+
     fun getProfile(position: Int): ProfileEntry {
         return profilesData.value!!.get(position)
     }
 
     fun addProfile(profile: ProfileEntry) {
         profilesData.value?.add(profile)
+    }
+
+    fun getPosition(profile: ProfileEntry): Int {
+        return profilesData.value!!.indexOfFirst {
+            profile.id == it.id
+        }
+    }
+
+    fun removeProfile(profile: ProfileEntry) {
+        profilesData.value?.remove(profile)
     }
 }
 
@@ -99,5 +112,45 @@ class ProfileFragmentAdapter(
     override fun createFragment(position: Int): Fragment {
         val profile = profiles[position]
         return ColorGridFragment.create(profile)
+    }
+}
+
+
+class ProfileDeleteDialog : DialogFragment() {
+    private var listener: ProfileDeleteListener? = null
+
+    interface ProfileDeleteListener {
+        fun onProfileDelete()
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        return activity?.let {
+            val profileName = requireArguments().getString(PROFILE_NAME_KEY)
+            val builder = AlertDialog.Builder(it)
+            builder.setMessage("Are you sure you wish to delete '${profileName}'?")
+                .setPositiveButton("Delete") { dialog, id ->
+                    listener?.onProfileDelete()
+                }
+                .setNegativeButton("Cancel") { _, _ ->
+                    if (showsDialog)
+                        dismiss()
+                }
+            builder.create()
+        } ?: throw IllegalStateException("Activity cannot be null")
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as? ProfileDeleteListener
+    }
+
+    companion object {
+        const val PROFILE_NAME_KEY = "PROFILE_NAME"
+
+        fun create(profile: ProfileEntry): ProfileDeleteDialog {
+            val fragment = ProfileDeleteDialog()
+            fragment.arguments = Bundle().apply { putString(PROFILE_NAME_KEY, profile.name) }
+            return fragment
+        }
     }
 }

@@ -1,14 +1,15 @@
 package com.mare5x.colorcalendar
 
+import ProfileDeleteDialog
 import ProfileFragmentAdapter
 import ProfileSpinnerAdapter
 import ProfilesViewModel
 import ProfilesViewModelFactory
+import android.app.AlertDialog
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -27,6 +28,7 @@ import java.util.*
 class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val currentProfile = MutableLiveData<ProfileEntry>()
     private val insertedProfile = MutableLiveData<ProfileEntry>()
+    private val deletedProfile = MutableLiveData<ProfileEntry>()
     private val insertedEntry = MutableLiveData<Entry>()
 
     fun getCurrentProfile() = currentProfile
@@ -40,6 +42,13 @@ class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
             profile.creationDate = Date()
             profile.id = db.insertProfile(profile)
             insertedProfile.postValue(profile)
+        }
+    }
+    fun getDeletedProfile() = deletedProfile
+    fun deleteProfile(profile: ProfileEntry) {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.deleteProfile(profile)
+            deletedProfile.postValue(profile)
         }
     }
 
@@ -64,7 +73,7 @@ class MainViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.F
 }
 
 
-class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener, ProfileEditorDialogFragment.ProfileEditorListener {
+class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener, ProfileEditorDialogFragment.ProfileEditorListener, ProfileDeleteDialog.ProfileDeleteListener {
 
     private lateinit var db: DatabaseHelper
     private lateinit var viewPager: ViewPager2
@@ -123,6 +132,16 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
             changeProfile(profile)
         }
 
+        mainViewModel.getDeletedProfile().observe(this) { profile ->
+            val index = profilesViewModel.getPosition(profile)
+            profilesViewModel.removeProfile(profile)
+            profileSpinnerAdapter.remove(profile)
+            profileFragmentAdapter.notifyItemRemoved(index)
+
+            val newProfile = profilesViewModel.getProfile(index % profilesViewModel.getSize())
+            changeProfile(newProfile)
+        }
+
         profilesViewModel.getProfiles().observe(this) { profiles ->
             if (profiles.isNotEmpty()) {
                 profileSpinnerAdapter.clear()
@@ -154,9 +173,14 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
             R.id.action_settings -> true
-            R.id.action_profile -> {
+            R.id.action_create_profile -> {
                 val dialog = ProfileEditorDialogFragment()
                 dialog.show(supportFragmentManager, "profileEditor")
+                true
+            }
+            R.id.action_delete_profile -> {
+                val dialog = ProfileDeleteDialog.create(mainViewModel.getCurrentProfile().value!!)
+                dialog.show(supportFragmentManager, "profileDelete")
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -201,6 +225,12 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
 
     fun onProfileChanged(profile: ProfileEntry) {
         setUIColor(profile.prefColor)
+    }
+
+    override fun onProfileDelete() {
+        mainViewModel.run {
+            deleteProfile(getCurrentProfile().value!!)
+        }
     }
 
     companion object {

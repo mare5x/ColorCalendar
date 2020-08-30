@@ -127,6 +127,19 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return -1
     }
 
+    fun deleteProfile(profile: ProfileEntry) {
+        if (writableDB == null) writableDB = writableDatabase
+        writableDB!!.delete(
+            DatabaseContract.EntryDB.TABLE_NAME,
+            "${DatabaseContract.EntryDB.PROFILE_FK} = ${profile.id}",
+            null)
+        writableDB!!.delete(
+            DatabaseContract.ProfileEntryDB.TABLE_NAME,
+            "${BaseColumns._ID} = ${profile.id}",
+            null
+        )
+    }
+
     fun insertEntry(entry: Entry): Long {
         if (entry.profile == null || entry.profile!!.id < 0) {
             throw Exception("Invalid profile id for $entry")
