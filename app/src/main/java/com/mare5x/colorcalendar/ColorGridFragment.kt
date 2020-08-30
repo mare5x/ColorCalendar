@@ -54,8 +54,10 @@ class ColorGridFragment : Fragment() {
                 val profile = gridModel.getProfile().value!!
                 val position = calcDayDifference(profile.creationDate, entry.date!!)
                 val entriesByDayData = adapter.dayEntries
-                entriesByDayData[position].add(entry)
                 // TODO ensure day list is big enough (midnight ...)
+                if (entriesByDayData.isNotEmpty() && position < entriesByDayData.size) {
+                    entriesByDayData[position].add(entry)
+                }
 
                 adapter.notifyItemChanged(position)
             }
