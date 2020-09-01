@@ -42,6 +42,12 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
         return profilesData.value!!.get(position)
     }
 
+    fun getProfile(id: Long): ProfileEntry? {
+        return profilesData.value!!.find {
+            it.id == id
+        }
+    }
+
     fun addProfile(profile: ProfileEntry) {
         profilesData.value?.add(profile)
     }

@@ -66,6 +66,9 @@ class ColorGridFragment : Fragment() {
         adapter.clickListener = { day ->
             val dayEntries = adapter.dayEntries
             Toast.makeText(context, "Day: $day (${dayEntries[day].size})", Toast.LENGTH_SHORT).show()
+
+            val dialog = EntryViewerDialog.create(adapter.profile, day)
+            dialog.show(childFragmentManager, "entryViewer")
         }
     }
 

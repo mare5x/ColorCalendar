@@ -129,5 +129,6 @@ class ColorGrid : RecyclerView {
 
     init {
         layoutManager = GridLayoutManager(context, 14)
+        setHasFixedSize(true)  // Optimization
     }
 }
