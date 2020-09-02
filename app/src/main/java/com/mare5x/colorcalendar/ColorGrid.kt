@@ -37,12 +37,14 @@ fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creation
 
 typealias EntryList = Array<MutableList<Entry>>
 
-class ColorGridViewModel(private val db: DatabaseHelper) : ViewModel() {
+class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val entriesByDayData = MutableLiveData<EntryList>()
     private val profileData = MutableLiveData<ProfileEntry>()
+    private val dayChanged = MutableLiveData<Int>()
 
     fun getEntriesByDay() = entriesByDayData
     fun getProfile() = profileData
+    fun getDayChanged() = dayChanged
 
     fun setProfile(profile: ProfileEntry) {
         profileData.value = profile
@@ -68,13 +70,23 @@ class ColorGridViewModel(private val db: DatabaseHelper) : ViewModel() {
             entriesByDayData.postValue(dayEntries)
         }
     }
+
+    fun setDayEntries(dayPosition: Int, entries: MutableList<Entry>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.deleteDayEntries(profileData.value!!, dayPosition)
+            db.insertEntries(entries)
+
+            entriesByDayData.value!![dayPosition] = entries
+            dayChanged.postValue(dayPosition)
+        }
+    }
 }
 
 class ColorGridViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel?> create(modelClass: Class<T>): T {
-        return ColorGridViewModel(db) as T
+        return EntriesViewModel(db) as T
     }
 }
 

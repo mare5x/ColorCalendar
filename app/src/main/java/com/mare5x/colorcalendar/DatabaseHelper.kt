@@ -318,6 +318,29 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return res
     }
 
+    fun deleteDayEntries(profile: ProfileEntry, dayPosition: Int): Int {
+        val entryDB = DatabaseContract.EntryDB
+        val dateStr = DatabaseContract.DATE_FORMAT.format(profile.creationDate)
+        val whereStr = """
+                ${entryDB.PROFILE_FK} = ${profile.id} 
+                AND
+                CAST((julianday(${entryDB.DATE}) - julianday(DATE("${dateStr}"))) AS INTEGER) = ${dayPosition}
+            """.trimIndent()
+        // NOTE 'floor' isn't supported ... Casting only works for non-negative integers, which
+        // means profile creation date MUST be earlier than entry date.
+        // TODO check timezone issues?
+
+        if (writableDB == null) writableDB = writableDatabase
+        return writableDB!!.delete(entryDB.TABLE_NAME, whereStr, null)
+    }
+
+    fun insertEntries(entries: List<Entry>) {
+        // TODO bulk
+        entries.forEach { entry ->
+            insertEntry(entry)
+        }
+    }
+
     fun getProfilesCount(): Long {
         if (readableDB == null) readableDB = readableDatabase
         return DatabaseUtils.queryNumEntries(readableDB, DatabaseContract.ProfileEntryDB.TABLE_NAME)
