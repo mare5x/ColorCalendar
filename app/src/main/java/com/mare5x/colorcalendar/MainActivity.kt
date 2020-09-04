@@ -24,6 +24,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.*
 
+// NOTE: for constraint layout see the developer guide at:
+// https://developer.android.com/reference/androidx/constraintlayout/widget/ConstraintLayout
 
 class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val currentProfile = MutableLiveData<ProfileEntry>()
