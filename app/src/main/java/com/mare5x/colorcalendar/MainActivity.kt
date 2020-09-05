@@ -1,11 +1,5 @@
 package com.mare5x.colorcalendar
 
-import ProfileDeleteDialog
-import ProfileFragmentAdapter
-import ProfileSpinnerAdapter
-import ProfilesViewModel
-import ProfilesViewModelFactory
-import android.app.AlertDialog
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
@@ -26,6 +20,8 @@ import java.util.*
 
 // NOTE: for constraint layout see the developer guide at:
 // https://developer.android.com/reference/androidx/constraintlayout/widget/ConstraintLayout
+// NOTE: fragment's parent must implement interface ... Using function callbacks doesn't work because of configuration changes ...!
+// NOTE: Dialog's use wrap_content for layout width and height ...
 
 class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val currentProfile = MutableLiveData<ProfileEntry>()
@@ -57,9 +53,6 @@ class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
     fun getInsertedEntry() = insertedEntry
     fun insertEntry(entry: Entry) {
         viewModelScope.launch(Dispatchers.IO) {
-            val profile = currentProfile.value!!
-            entry.profile = profile
-            entry.date = Date()
             entry.id = db.insertEntry(entry)
             insertedEntry.postValue(entry)
         }
@@ -75,7 +68,7 @@ class MainViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.F
 }
 
 
-class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerListener, ProfileEditorDialogFragment.ProfileEditorListener, ProfileDeleteDialog.ProfileDeleteListener {
+class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener, ProfileEditorDialogFragment.ProfileEditorListener, ProfileDeleteDialog.ProfileDeleteListener {
 
     private lateinit var db: DatabaseHelper
     private lateinit var viewPager: ViewPager2
@@ -92,8 +85,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         db = DatabaseHelper(this)
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
-            val dialog = ColorPickerDialogFragment()
-            dialog.show(supportFragmentManager, "colorPicker")
+            val dialog = EntryEditorDialog.create(mainViewModel.getCurrentProfile().value!!)
+            dialog.show(supportFragmentManager, "entryEditor")
         }
 
         // Set up a spinner instead of the title in the app bar.
@@ -192,12 +185,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         }
     }
 
-    override fun onColorConfirm(value: Float) {
-        mainViewModel.insertEntry(Entry(value = value))
-    }
-
-    override fun onColorCancel(value: Float) { }
-
     override fun onProfileConfirm(name: String, minColor: Int, maxColor: Int, prefColor: Int) {
         mainViewModel.insertProfile(ProfileEntry(
             name = name,
@@ -236,6 +223,22 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogFragment.ColorPickerL
         mainViewModel.run {
             deleteProfile(getCurrentProfile().value!!)
         }
+    }
+
+    override fun onEntryCancel() {}
+
+    override fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) {
+        val t = Calendar.getInstance().apply {
+            set(Calendar.MINUTE, minute)
+            set(Calendar.HOUR_OF_DAY, hourOfDay)
+        }
+        val profile = mainViewModel.getCurrentProfile().value!!
+        val entry = Entry(
+            profile = profile,
+            value = value,
+            date = t.time
+        )
+        mainViewModel.insertEntry(entry)
     }
 
     companion object {

@@ -1,3 +1,5 @@
+package com.mare5x.colorcalendar
+
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
@@ -14,7 +16,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.viewpager2.adapter.FragmentStateAdapter
-import com.mare5x.colorcalendar.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 

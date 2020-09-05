@@ -1,6 +1,5 @@
 package com.mare5x.colorcalendar
 
-import ProfilesViewModel
 import android.app.Dialog
 import android.app.TimePickerDialog
 import android.content.Context
@@ -270,10 +269,11 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
-        if (context is EntryEditorListener) {
-            listener = context
-        } else {
+        // Dialog can be spawned either by a fragment/dialog or the main activity.
+        if (parentFragment is EntryEditorListener) {
             listener = parentFragment as EntryEditorListener
+        } else {
+            listener = context as? EntryEditorListener
         }
     }
 
