@@ -94,7 +94,7 @@ class ColorRectAdapter(var profile: ProfileEntry) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
 
     class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
-        val rect: ColorRect
+        val rect: ColorRectButton
 
         var clickListener: (position: Int) -> Unit = { }
 

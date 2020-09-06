@@ -10,9 +10,9 @@
     <item
         android:id="@+id/action_create_profile"
         android:orderInCategory="101"
-        android:title="Create Profile" />
+        android:title="@string/new_profile" />
     <item
         android:id="@+id/action_delete_profile"
         android:orderInCategory="102"
-        android:title="Delete profile" />
+        android:title="@string/delete_profile" />
 </menu>

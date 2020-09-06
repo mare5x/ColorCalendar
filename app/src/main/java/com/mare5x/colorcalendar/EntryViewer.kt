@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
+import java.text.SimpleDateFormat
 import java.util.*
 
 class EntryAdapter(
@@ -25,6 +26,8 @@ class EntryAdapter(
     private val profile: ProfileEntry,
     private val onAddEntryClicked: () -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    private val entryDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     class EntryViewHolder(v: View) : RecyclerView.ViewHolder(v) {
         val colorItem: ColorRect = v.findViewById(R.id.colorRect)
@@ -59,7 +62,7 @@ class EntryAdapter(
             is EntryViewHolder -> {
                 val entry = entries[position]
                 holder.colorItem.color = calcGradientColor(profile.minColor, profile.maxColor, entry.value)
-                holder.entryText.text = entry.date.toString()
+                holder.entryText.text = entryDateFormat.format(entry.date)
             }
             is AdderViewHolder -> {
                 holder.button.setOnClickListener {
@@ -91,6 +94,8 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
     private lateinit var profile: ProfileEntry
     private lateinit var adapter: EntryAdapter
 
+    private val titleDateFormat = SimpleDateFormat("EEEE, d MMM yyyy", Locale.getDefault())
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -117,6 +122,14 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         }
         val viewer = view.findViewById<EntryViewer>(R.id.entryViewer)
         viewer.adapter = adapter
+
+        view.findViewById<TextView>(R.id.entryViewerTitle).let {
+            val t = Calendar.getInstance().apply {
+                time = profile.creationDate
+                add(Calendar.DAY_OF_MONTH, dayPosition)
+            }
+            it.text = titleDateFormat.format(t.time)
+        }
 
         // Set up handler for managing swiping to delete items from the list.
         val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT.or(ItemTouchHelper.LEFT)) {
