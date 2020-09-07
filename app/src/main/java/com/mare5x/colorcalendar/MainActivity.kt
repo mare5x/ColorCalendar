@@ -23,7 +23,7 @@ import java.util.*
 // NOTE: fragment's parent must implement interface ... Using function callbacks doesn't work because of configuration changes ...!
 // NOTE: Dialog's use wrap_content for layout width and height ...
 
-class MainViewModel(private val db: DatabaseHelper) : ViewModel() {
+class MainViewModel(val db: DatabaseHelper) : ViewModel() {
     private val currentProfile = MutableLiveData<ProfileEntry>()
     private val insertedProfile = MutableLiveData<ProfileEntry>()
     private val deletedProfile = MutableLiveData<ProfileEntry>()

@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.collections.ArrayList
 
 fun calcDayDifference(d1: Date, d2: Date): Int {
     // Remove time information to calculate only the difference in days ...
@@ -35,7 +36,7 @@ fun calcDayDifference(d1: Date, d2: Date): Int {
 
 fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creationDate, Date()) + 1
 
-typealias EntryList = Array<SortedSet<Entry>>
+typealias EntryList = MutableList<SortedSet<Entry>>
 
 class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val entriesByDayData = MutableLiveData<EntryList>()
@@ -46,7 +47,7 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
     fun getProfile() = profileData
     fun getDayChanged() = dayChanged
 
-    fun setProfile(profile: ProfileEntry) {
+    private fun setProfile(profile: ProfileEntry) {
         profileData.value = profile
         fetchGridEntries(profile)
     }
@@ -59,7 +60,11 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             val entries = db.queryAllEntries(profile)
 
-            val dayEntries = EntryList(getProfileDayAge(profile)) { sortedSetOf() }
+            val size = getProfileDayAge(profile)
+            // Slightly larger capacity for eventual resizing.
+            val dayEntries = ArrayList<SortedSet<Entry>>(size + 7)
+            repeat(size) { dayEntries.add(sortedSetOf()) }
+
             entries.forEach {
                 if (it.date != null) {
                     val day = calcDayDifference(profile.creationDate, it.date!!)
@@ -68,6 +73,13 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
             }
 
             entriesByDayData.postValue(dayEntries)
+        }
+    }
+
+    fun ensureEntriesSize(newSize: Int) {
+        val entries = entriesByDayData.value
+        if (entries != null && newSize > entries.size) {
+            repeat(newSize - entries.size) { entries.add(sortedSetOf()) }
         }
     }
 
@@ -96,7 +108,7 @@ class ColorRectAdapter(var profile: ProfileEntry) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
 
     class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
-        val rect: ColorRectButton
+        val rect: ColorRect
 
         var clickListener: (position: Int) -> Unit = { }
 
@@ -107,7 +119,7 @@ class ColorRectAdapter(var profile: ProfileEntry) :
     }
 
     // Refers to the list in the view model.
-    var dayEntries: EntryList = emptyArray()
+    var dayEntries: EntryList = mutableListOf()
         set(value) {
             field = value
             notifyDataSetChanged()

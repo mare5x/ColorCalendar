@@ -61,7 +61,7 @@ class EntryAdapter(
             is EntryViewHolder -> {
                 val entry = entries[position]
                 holder.colorItem.color = calcGradientColor(profile.minColor, profile.maxColor, entry.value)
-                holder.entryText.text = entryDateFormat.format(entry.date)
+                holder.entryText.text = entryDateFormat.format(entry.date!!)
             }
             is AdderViewHolder -> {
                 holder.button.setOnClickListener {
@@ -173,6 +173,16 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
 
         if (entriesChanged) {
             entriesViewModel.setDayEntries(dayPosition, entries)
+            entriesChanged = false
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        if (entriesChanged) {
+            entriesViewModel.setDayEntries(dayPosition, entries)
+            entriesChanged = false
         }
     }
 

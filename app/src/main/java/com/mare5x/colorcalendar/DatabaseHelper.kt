@@ -303,7 +303,6 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             SELECT *
             FROM ${entryDB.TABLE_NAME}
             WHERE ${entryDB.PROFILE_FK} = ${profile.id}
-            ORDER BY ${entryDB.DATE} ASC
         """.trimIndent()
 
         if (readableDB == null) readableDB = readableDatabase
