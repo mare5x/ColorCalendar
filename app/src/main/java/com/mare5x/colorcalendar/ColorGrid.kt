@@ -35,7 +35,7 @@ fun calcDayDifference(d1: Date, d2: Date): Int {
 
 fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creationDate, Date()) + 1
 
-typealias EntryList = Array<MutableList<Entry>>
+typealias EntryList = Array<SortedSet<Entry>>
 
 class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val entriesByDayData = MutableLiveData<EntryList>()
@@ -59,7 +59,7 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             val entries = db.queryAllEntries(profile)
 
-            val dayEntries = EntryList(getProfileDayAge(profile)) { mutableListOf() }
+            val dayEntries = EntryList(getProfileDayAge(profile)) { sortedSetOf() }
             entries.forEach {
                 if (it.date != null) {
                     val day = calcDayDifference(profile.creationDate, it.date!!)
@@ -71,12 +71,14 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
         }
     }
 
-    fun setDayEntries(dayPosition: Int, entries: MutableList<Entry>) {
+    fun setDayEntries(dayPosition: Int, entries: Collection<Entry>) {
         viewModelScope.launch(Dispatchers.IO) {
             db.deleteDayEntries(profileData.value!!, dayPosition)
             db.insertEntries(entries)
 
-            entriesByDayData.value!![dayPosition] = entries
+            val dayEntries = entriesByDayData.value!![dayPosition]
+            dayEntries.clear()
+            dayEntries.addAll(entries)
             dayChanged.postValue(dayPosition)
         }
     }

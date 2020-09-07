@@ -34,7 +34,6 @@ class EntryAdapter(
         val entryText: TextView = v.findViewById(R.id.entryText)
     }
 
-    // TODO style this button
     class AdderViewHolder(v: View) : RecyclerView.ViewHolder(v) {
         val button: Button = v.findViewById(R.id.addButton)
     }
@@ -161,6 +160,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
                     .setAction("UNDO") {
                         entries.add(position, entry)
                         adapter.notifyItemInserted(position)
+                        viewer.scrollToPosition(position)
                     }
                 snackbar.show()
             }

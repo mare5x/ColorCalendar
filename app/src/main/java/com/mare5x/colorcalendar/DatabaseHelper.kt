@@ -76,7 +76,13 @@ data class Entry(
     var profile: ProfileEntry? = null,
     var date: Date? = null,
     var value: Float = 0f
-)
+) : Comparable<Entry> {
+
+    // Order Entries by date
+    override fun compareTo(other: Entry): Int {
+        return compareValuesBy(this, other, { it.date }, { it.id }, { it.value })
+    }
+}
 
 
 class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
@@ -297,6 +303,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             SELECT *
             FROM ${entryDB.TABLE_NAME}
             WHERE ${entryDB.PROFILE_FK} = ${profile.id}
+            ORDER BY ${entryDB.DATE} ASC
         """.trimIndent()
 
         if (readableDB == null) readableDB = readableDatabase
@@ -334,7 +341,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return writableDB!!.delete(entryDB.TABLE_NAME, whereStr, null)
     }
 
-    fun insertEntries(entries: List<Entry>) {
+    fun insertEntries(entries: Collection<Entry>) {
         // TODO bulk
         entries.forEach { entry ->
             insertEntry(entry)
