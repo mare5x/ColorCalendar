@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.math.MathUtils.clamp
 import androidx.lifecycle.*
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
+import kotlin.math.roundToInt
 
 fun calcDayDifference(d1: Date, d2: Date): Int {
     // Remove time information to calculate only the difference in days ...
@@ -153,8 +155,21 @@ class ColorGrid : RecyclerView {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
+    private val gridLayoutManager: GridLayoutManager
+
     init {
-        layoutManager = GridLayoutManager(context, 14)
+        gridLayoutManager = GridLayoutManager(context, 7)
+        layoutManager = gridLayoutManager
         setHasFixedSize(true)  // Optimization
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+
+        // Set the number of grid columns, so that each item is 'itemSize' pixels large.
+        val itemSize = resources.getDimension(R.dimen.color_item_size) * 0.75
+        val marginSize = resources.getDimension(R.dimen.grid_item_margin)
+        val cols = w / (itemSize + 2.0 * marginSize)
+        gridLayoutManager.spanCount = clamp(cols.roundToInt(), 2, 14)
     }
 }
