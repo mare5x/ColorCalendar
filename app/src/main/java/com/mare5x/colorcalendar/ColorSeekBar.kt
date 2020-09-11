@@ -1,18 +1,22 @@
 package com.mare5x.colorcalendar
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Color
+import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.MotionEvent.INVALID_POINTER_ID
+import android.view.View
 import android.widget.SeekBar
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.graphics.blue
 import androidx.core.graphics.green
 import androidx.core.graphics.red
-import kotlin.math.abs
+import kotlin.math.*
 
 fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
     val hsv1 = floatArrayOf(0f, 0f, 0f)
@@ -156,3 +160,200 @@ class ColorPickerBar : ConstraintLayout {
         updateColorRect()
     }
 }
+
+
+class ThumbDrawable : Drawable() {
+    private val thumbPaint: Paint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.FILL_AND_STROKE
+        color = Color.WHITE
+    }
+
+    override fun draw(canvas: Canvas) {
+        val cx = bounds.exactCenterX()
+        val cy = bounds.exactCenterY()
+        val r = cx - bounds.left
+        canvas.drawCircle(cx, cy, r, thumbPaint)
+    }
+
+    override fun setAlpha(alpha: Int) {}
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {}
+
+    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+}
+
+class BarThumb {
+    var pointerID: Int = INVALID_POINTER_ID
+    var touchPoint = PointF()
+
+    var centerPoint = PointF()
+    var progress: Float = 0f
+
+    var isDragging: Boolean = false
+    var radius: Float = 0f  // px units
+
+    var drawable: Drawable = ThumbDrawable()
+
+    fun updatePosition(circleCenter: PointF, circleRadius: Float) {
+        val phi: Float = (progress * 2f * PI).toFloat()
+        centerPoint.apply {
+            set(cos(phi) * circleRadius, sin(phi) * circleRadius)
+            offset(circleCenter.x, circleCenter.y)
+        }
+    }
+
+    fun draw(canvas: Canvas) {
+        drawable.setBounds(
+            (centerPoint.x - radius).toInt(),
+            (centerPoint.y - radius).toInt(),
+            (centerPoint.x + radius).toInt(),
+            (centerPoint.y + radius).toInt()
+        )
+        drawable.draw(canvas)
+    }
+}
+
+class ColorCircleBar : View {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    var onValueChanged: (value0: Float, value1: Float) -> Unit = { _, _ ->  }
+
+    private var circleRadius: Float = 0f  // px units
+    private val centerPoint: PointF = PointF()  // local px units
+    private val thumb0 = BarThumb()
+    private val thumb1 = BarThumb()
+    private val thumbs = listOf(thumb0, thumb1)
+
+    private lateinit var hueShader: SweepGradient
+    private val huePaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+
+    private var barRadius: Float = 12f  // dp units
+    private var padding: Float = 8f  // dp units
+    private var thumbDetectionRadius: Float = 4f  // dp units
+
+    override fun onDraw(canvas: Canvas?) {
+        canvas?.run {
+            drawCircle(centerPoint.x, centerPoint.y, circleRadius, huePaint)
+            thumb0.draw(canvas)
+            thumb1.draw(canvas)
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+
+        val scale = resources.displayMetrics.density
+        val barRadiusPx = barRadius * scale
+        centerPoint.set(w * 0.5f, h * 0.5f)
+        val a = min(w, h) - 2f * scale * padding
+        circleRadius = 0.5f * a - barRadiusPx
+
+        thumb0.radius = barRadiusPx * 0.8f
+        thumb1.radius = barRadiusPx * 0.8f
+        thumb0.updatePosition(centerPoint, circleRadius)
+        thumb1.updatePosition(centerPoint, circleRadius)
+
+        hueShader = SweepGradient(centerPoint.x, centerPoint.y, intArrayOf(
+            Color.RED, Color.MAGENTA, Color.BLUE, Color.CYAN,
+            Color.GREEN, Color.YELLOW, Color.RED
+        ), null)
+        huePaint.shader = hueShader
+        huePaint.strokeWidth = 2f * barRadiusPx
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        return when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                var touchHandled = false
+                val detectionRadius = thumbDetectionRadius * resources.displayMetrics.density + barRadius
+
+                val pointerIndex = event.actionIndex
+                val pointerID = event.getPointerId(pointerIndex)
+
+                val touchPoint = PointF(event.getX(pointerIndex), event.getY(pointerIndex))
+                val r = hypot(touchPoint.x - centerPoint.x, touchPoint.y - centerPoint.y)
+                if (r >= circleRadius - detectionRadius && r <= circleRadius + detectionRadius) {
+                    performClick()
+
+                    val thumb =
+                        if (thumb0.pointerID == INVALID_POINTER_ID && thumb1.pointerID == INVALID_POINTER_ID) {
+                            if (dist2(thumb0.centerPoint, touchPoint) <= dist2(thumb1.centerPoint, touchPoint))
+                                thumb0
+                            else
+                                thumb1
+                        } else if (thumb0.pointerID == INVALID_POINTER_ID) {
+                            thumb0
+                        } else if (thumb1.pointerID == INVALID_POINTER_ID) {
+                            thumb1
+                        } else {
+                            null
+                        }
+
+                    if (thumb != null) {
+                        thumb.pointerID = pointerID
+                        thumb.touchPoint = touchPoint
+                        thumb.isDragging = true
+                        touchHandled = handleTouch(thumb) || touchHandled
+                    }
+                }
+
+                touchHandled
+            }
+            MotionEvent.ACTION_MOVE -> {
+                var touchHandled = false
+                for (thumb in thumbs) {
+                    if (thumb.pointerID != INVALID_POINTER_ID) {
+                        event.findPointerIndex(thumb.pointerID).let { index ->
+                            if (index != INVALID_POINTER_ID) {
+                                thumb.touchPoint.set(event.getX(index), event.getY(index))
+                                touchHandled = handleTouch(thumb) || touchHandled
+                            }
+                        }
+                    }
+                }
+                true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                for (thumb in thumbs) {
+                    thumb.pointerID = INVALID_POINTER_ID
+                    thumb.isDragging = false
+                }
+                true
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val pointerIndex = event.actionIndex
+                val pointerID = event.getPointerId(pointerIndex)
+                for (thumb in thumbs) {
+                    if (thumb.pointerID != INVALID_POINTER_ID && thumb.pointerID == pointerID) {
+                        thumb.pointerID = INVALID_POINTER_ID
+                        thumb.isDragging = false
+                    }
+                }
+                true
+            }
+            else -> super.onTouchEvent(event)
+        }
+    }
+
+    private fun handleTouch(thumb: BarThumb): Boolean {
+        val (x, y) = (thumb.touchPoint.x - centerPoint.x) to (thumb.touchPoint.y - centerPoint.y)
+        val phi = atan2(y, x)
+
+        thumb.progress = (phi / (2f * PI)).toFloat()
+        thumb.updatePosition(centerPoint, circleRadius)
+
+        onValueChanged(thumb0.progress, thumb1.progress)
+
+        // TODO invalidate drawable
+        invalidate()
+        return true
+    }
+}
+
+fun square(x: Float) = x * x
+fun dist2(a: PointF, b: PointF): Float = square(b.x - a.x) + square(b.y - a.y)
