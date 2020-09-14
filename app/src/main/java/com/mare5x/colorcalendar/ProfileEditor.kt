@@ -1,12 +1,11 @@
 package com.mare5x.colorcalendar
 
+import android.app.AlertDialog
+import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.MenuItem
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -116,7 +115,76 @@ class ProfileEditorDialogFragment : DialogFragment() {
 }
 
 
-class ProfileEditorActivity : AppCompatActivity() {
+class ProfileDeleteDialog : DialogFragment() {
+    private var listener: ProfileDeleteListener? = null
+
+    interface ProfileDeleteListener {
+        fun onProfileDelete()
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        return activity?.let {
+            val profileName = requireArguments().getString(PROFILE_NAME_KEY)
+            val builder = AlertDialog.Builder(it)
+            builder.setMessage("Are you sure you wish to delete '${profileName}'?")
+                .setPositiveButton("Delete") { _, _ ->
+                    listener?.onProfileDelete()
+                }
+                .setNegativeButton("Cancel") { _, _ ->
+                    if (showsDialog)
+                        dismiss()
+                }
+            builder.create()
+        } ?: throw IllegalStateException("Activity cannot be null")
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as? ProfileDeleteListener
+    }
+
+    companion object {
+        const val PROFILE_NAME_KEY = "PROFILE_NAME"
+
+        fun create(profile: ProfileEntry): ProfileDeleteDialog {
+            val fragment = ProfileDeleteDialog()
+            fragment.arguments = Bundle().apply { putString(PROFILE_NAME_KEY, profile.name) }
+            return fragment
+        }
+    }
+}
+
+
+class ProfileDiscardDialog : DialogFragment() {
+    interface ProfileDiscardListener {
+        fun onProfileDiscard()
+    }
+
+    private var listener: ProfileDiscardListener? = null
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        return activity?.let {
+            val builder = AlertDialog.Builder(it)
+            builder.setMessage("Discard this profile?")
+                .setPositiveButton("Discard") { _, _ ->
+                    listener?.onProfileDiscard()
+                }
+                .setNegativeButton("Cancel") { _, _ ->
+                    if (showsDialog)
+                        dismiss()
+                }
+            builder.create()
+        } ?: throw IllegalStateException("Activity cannot be null")
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as? ProfileDiscardListener
+    }
+}
+
+
+class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -140,13 +208,39 @@ class ProfileEditorActivity : AppCompatActivity() {
         }
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_profile_editor, menu)
+        return true
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
-                onBackPressed()
+                attemptDismiss()
+                true
+            }
+            R.id.action_confirm_profile -> {
+                dismiss()
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    override fun onBackPressed() {
+        attemptDismiss()
+    }
+
+    override fun onProfileDiscard() {
+        dismiss()
+    }
+
+    private fun attemptDismiss() {
+        val dialog = ProfileDiscardDialog()
+        dialog.show(supportFragmentManager, "profileDiscard")
+    }
+
+    private fun dismiss() {
+        super.onBackPressed()
     }
 }
