@@ -5,6 +5,9 @@ import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
 import android.view.*
 import android.widget.Button
@@ -211,6 +214,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         circleBar.onValueChanged = { a, b ->
             testText.text = "$a $b"
             colorBar.setColors(hueColor(a), hueColor(b))
+            setUIColor(colorBar.getColor())
+        }
+        colorBar.onValueChanged = { _, prefColor ->
+            setUIColor(prefColor)
         }
     }
 
@@ -261,6 +268,16 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
         }
         setResult(RESULT_OK, intent)
+    }
+
+    private fun setUIColor(color: Int) {
+        supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val hsv = floatArrayOf(0f, 0f, 0f)
+            Color.colorToHSV(color, hsv)
+            hsv[2] *= 0.8f
+            window.statusBarColor = Color.HSVToColor(hsv)
+        }
     }
 
     companion object {
