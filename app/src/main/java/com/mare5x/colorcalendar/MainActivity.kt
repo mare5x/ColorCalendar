@@ -1,5 +1,6 @@
 package com.mare5x.colorcalendar
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
@@ -179,6 +180,11 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
             R.id.action_delete_profile -> {
                 val dialog = ProfileDeleteDialog.create(mainViewModel.getCurrentProfile().value!!)
                 dialog.show(supportFragmentManager, "profileDelete")
+                true
+            }
+            R.id.action_test -> {
+                val intent = Intent(this, ProfileEditorActivity::class.java)
+                startActivityForResult(intent, 0)
                 true
             }
             else -> super.onOptionsItemSelected(item)

@@ -1,13 +1,17 @@
 package com.mare5x.colorcalendar
 
+import android.app.Activity
 import android.content.Context
 import android.content.DialogInterface
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
 
 class ProfileEditorDialogFragment : DialogFragment() {
@@ -109,5 +113,24 @@ class ProfileEditorDialogFragment : DialogFragment() {
     companion object {
         private const val STATE_MIN_COLOR = "state_min_color"
         private const val STATE_MAX_COLOR = "state_max_color"
+    }
+}
+
+
+class ProfileEditorActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        setContentView(R.layout.activity_profile_editor)
+        setSupportActionBar(findViewById(R.id.toolbar))
+
+        val circleBar = findViewById<ColorCircleBar>(R.id.colorCircleBar)
+        val testText = findViewById<TextView>(R.id.testText)
+        val colorBar = findViewById<ColorSeekBar>(R.id.colorSeekBar)
+        circleBar.onValueChanged = { a, b ->
+            testText.text = "$a $b"
+            colorBar.setColors(hueColor(a), hueColor(b))
+        }
     }
 }

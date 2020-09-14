@@ -40,6 +40,8 @@ fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
     return Color.HSVToColor(hsv)
 }
 
+fun hueColor(t: Float) = Color.HSVToColor(floatArrayOf(t * 360f, 1.0f, 1.0f))
+
 fun createGradientBitmap(startColor: Int, endColor: Int, width: Int) : Bitmap {
     val pixels = IntArray(width) { i ->
         calcGradientColor(startColor, endColor, i / width.toFloat())
@@ -114,7 +116,7 @@ class ColorSeekBar : androidx.appcompat.widget.AppCompatSeekBar {
 
     fun getColor(): Int {
         if (fullHue) {
-            return Color.HSVToColor(floatArrayOf(360f * getNormProgress(), 1f, 1f))
+            return hueColor(getNormProgress())
         }
         return calcGradientColor(startColor, endColor, getNormProgress())
     }
@@ -198,7 +200,7 @@ class BarThumb {
     fun updatePosition(circleCenter: PointF, circleRadius: Float) {
         val phi: Float = (progress * 2f * PI).toFloat()
         centerPoint.apply {
-            set(cos(phi) * circleRadius, sin(phi) * circleRadius)
+            set(cos(phi) * circleRadius, -sin(phi) * circleRadius)
             offset(circleCenter.x, circleCenter.y)
         }
     }
@@ -342,9 +344,11 @@ class ColorCircleBar : View {
 
     private fun handleTouch(thumb: BarThumb): Boolean {
         val (x, y) = (thumb.touchPoint.x - centerPoint.x) to (thumb.touchPoint.y - centerPoint.y)
-        val phi = atan2(y, x)
+        val phi = atan2(-y, x)
 
-        thumb.progress = (phi / (2f * PI)).toFloat()
+        var progress = phi / (2 * PI)
+        progress = if (progress < 0) (1 + progress) else (progress)
+        thumb.progress = progress.toFloat()
         thumb.updatePosition(centerPoint, circleRadius)
 
         onValueChanged(thumb0.progress, thumb1.progress)
