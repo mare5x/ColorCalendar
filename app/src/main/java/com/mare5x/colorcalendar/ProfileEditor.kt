@@ -1,11 +1,10 @@
 package com.mare5x.colorcalendar
 
-import android.app.Activity
 import android.content.Context
 import android.content.DialogInterface
 import android.os.Bundle
-import android.os.PersistableBundle
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -125,12 +124,29 @@ class ProfileEditorActivity : AppCompatActivity() {
         setContentView(R.layout.activity_profile_editor)
         setSupportActionBar(findViewById(R.id.toolbar))
 
+        // Add back arrow to toolbar (shouldn't it be automatic???)
+        val actionBar = supportActionBar
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true)
+            actionBar.setDisplayShowHomeEnabled(true)
+        }
+
         val circleBar = findViewById<ColorCircleBar>(R.id.colorCircleBar)
         val testText = findViewById<TextView>(R.id.testText)
         val colorBar = findViewById<ColorSeekBar>(R.id.colorSeekBar)
         circleBar.onValueChanged = { a, b ->
             testText.text = "$a $b"
             colorBar.setColors(hueColor(a), hueColor(b))
+        }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                onBackPressed()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 }
