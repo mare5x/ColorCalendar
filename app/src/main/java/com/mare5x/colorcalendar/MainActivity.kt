@@ -173,8 +173,8 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         return when (item.itemId) {
             R.id.action_settings -> true
             R.id.action_create_profile -> {
-                val dialog = ProfileEditorDialogFragment()
-                dialog.show(supportFragmentManager, "profileEditor")
+                val intent = Intent(this, ProfileEditorActivity::class.java)
+                startActivityForResult(intent, PROFILE_EDITOR_CODE)
                 true
             }
             R.id.action_delete_profile -> {
@@ -182,12 +182,24 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                 dialog.show(supportFragmentManager, "profileDelete")
                 true
             }
-            R.id.action_test -> {
-                val intent = Intent(this, ProfileEditorActivity::class.java)
-                startActivityForResult(intent, 0)
-                true
-            }
             else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PROFILE_EDITOR_CODE) {
+            if (resultCode == RESULT_OK) {
+                val bundle = data?.extras
+                if (bundle != null) {
+                    val profile = ProfileEntry()
+                    profile.name = bundle.getString(ProfileEditorActivity.PROFILE_NAME_KEY).toString()
+                    profile.minColor = bundle.getInt(ProfileEditorActivity.PROFILE_MIN_COLOR_KEY)
+                    profile.maxColor = bundle.getInt(ProfileEditorActivity.PROFILE_MAX_COLOR_KEY)
+                    profile.prefColor = bundle.getInt(ProfileEditorActivity.PROFILE_PREF_COLOR_KEY)
+                    mainViewModel.insertProfile(profile)
+                }
+            }
         }
     }
 
@@ -249,5 +261,6 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val PROFILE_EDITOR_CODE = 42
     }
 }

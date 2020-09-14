@@ -357,6 +357,9 @@ class ColorCircleBar : View {
         invalidate()
         return true
     }
+
+    fun getColor0(): Int = hueColor(thumb0.progress)
+    fun getColor1(): Int = hueColor(thumb1.progress)
 }
 
 fun square(x: Float) = x * x
