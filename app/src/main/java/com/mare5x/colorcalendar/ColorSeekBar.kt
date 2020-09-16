@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.PaintDrawable
 import android.os.Build
 import android.util.AttributeSet
 import android.view.LayoutInflater
@@ -12,6 +13,7 @@ import android.view.MotionEvent
 import android.view.MotionEvent.INVALID_POINTER_ID
 import android.view.View
 import android.widget.SeekBar
+import androidx.appcompat.widget.AppCompatSeekBar
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.graphics.blue
 import androidx.core.graphics.green
@@ -56,20 +58,38 @@ fun createHueGradientBitmap(width: Int) : Bitmap {
     return Bitmap.createBitmap(pixels, width, 1, Bitmap.Config.ARGB_8888)
 }
 
-class ColorSeekBar : androidx.appcompat.widget.AppCompatSeekBar {
+class ColorSeekBar2 : ColorSeekBar {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-    private var startColor: Int = Color.GRAY
-    private var endColor: Int = Color.GRAY
-    private var fullHue: Boolean = false
+    init {
+        updateGradientBackground()
+    }
+
+    override fun updateGradientBackground() {
+        val bg = ColorGradientDrawable(startColor, endColor, fullHue)
+
+        // progressDrawable = grad
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            background = bg
+        }
+    }
+}
+
+open class ColorSeekBar : AppCompatSeekBar {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    protected var startColor: Int = Color.GRAY
+    protected var endColor: Int = Color.GRAY
+    protected var fullHue: Boolean = false
 
     var onValueChanged: (value: Float, color: Int) -> Unit = { _, _ -> }
 
     init {
-        updateGradientBackground()
+        // updateGradientBackground()
 
-        setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+        this.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 onValueChanged(getNormProgress(), getColor())
             }
@@ -78,7 +98,7 @@ class ColorSeekBar : androidx.appcompat.widget.AppCompatSeekBar {
         })
     }
 
-    private fun updateGradientBackground() {
+    protected open fun updateGradientBackground() {
         if (fullHue) {
             setGradientBackground(createHueGradientBitmap(1024))
         } else {
@@ -163,6 +183,90 @@ class ColorPickerBar : ConstraintLayout {
     }
 }
 
+val HUE_COLORS = intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA)
+
+class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
+                            private var endColor: Int = Color.GRAY,
+                            private var fullHue: Boolean = false
+) : PaintDrawable() {
+
+    init {
+        val p = paint
+        p.isAntiAlias = true
+    }
+
+    override fun draw(canvas: Canvas) {
+        paint.shader =
+            if (fullHue)
+                createHueShader(bounds.width().toFloat())
+            else
+                createShader(startColor, endColor, bounds.width().toFloat())
+
+        super.draw(canvas)
+    }
+
+    private fun createHueShader(width: Float): Shader {
+        // The first and final colors must be the same.
+        return LinearGradient(0f, 0f, width, 0f, intArrayOf(*HUE_COLORS, HUE_COLORS[0]), null, Shader.TileMode.CLAMP)
+    }
+
+    private fun createShader(startColor: Int, endColor: Int, width: Float): Shader {
+        val hsv0 = FloatArray(3)
+        val hsv1 = FloatArray(3)
+        Color.colorToHSV(startColor, hsv0)
+        Color.colorToHSV(endColor, hsv1)
+        var alpha = hsv0[0] / 360f
+        var beta = hsv1[0] / 360f
+        val h = 1.0f / 6.0f
+        val eps = 0.001f
+        // alpha == k0 / 6 + r0
+        val r0 = alpha % h
+        val k0: Int = (6 * (alpha - r0)).toInt()
+        val r1 = beta % h
+        val k1 = (6 * (beta - r1)).toInt()
+
+        if (abs(beta - alpha) > 0.5f) {
+            if (alpha <= 0.5f) {
+                beta -= 1.0f
+            } else {
+                alpha -= 1.0f
+            }
+        }
+        val delta = abs(beta - alpha)
+        val dir: Int = sign(beta - alpha).toInt()
+
+
+        // If both colors are in the same color strip, just linearly interpolate.
+        if (beta >= k0 / 6.0 - eps && beta <= (k0 + 1) / 6.0 + eps) {
+            return LinearGradient(0f, 0f, width, 0f, startColor, endColor, Shader.TileMode.CLAMP)
+        }
+
+        val n = 2 + abs(if (dir > 0) (k1 - k0) else (k0 - k1))
+
+        val st = if (dir > 0) 0 else 1
+        val colors = IntArray(n) { i ->
+            when (i) {
+                0 -> startColor
+                n - 1 -> endColor
+                else -> HUE_COLORS[(k0 + i * dir + 12 + st) % 6]
+            }
+        }
+        var prev = 0f
+        val offsets = FloatArray(n) { i ->
+            val x = when (i) {
+                0 -> 0f
+                1 -> (if (dir > 0) (h - r0) else r0) / delta
+                n - 1 -> 1f
+                else -> h / delta + prev
+            }
+            prev = x
+            x
+        }
+
+        // Color and position arrays must be of equal length.
+        return LinearGradient(0f, 0f, width, 0f, colors, offsets, Shader.TileMode.CLAMP)
+    }
+}
 
 class ThumbDrawable : Drawable() {
     private val thumbPaint: Paint = Paint().apply {
@@ -195,7 +299,7 @@ class BarThumb {
     var isDragging: Boolean = false
     var radius: Float = 0f  // px units
 
-    var drawable: Drawable = ThumbDrawable()
+    private var drawable: Drawable = ThumbDrawable()
 
     fun updatePosition(circleCenter: PointF, circleRadius: Float) {
         val phi: Float = (progress * 2f * PI).toFloat()

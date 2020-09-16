@@ -192,7 +192,7 @@ class ProfileDiscardDialog : DialogFragment() {
 class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener {
     private lateinit var circleBar: ColorCircleBar
     private lateinit var profileText: EditText
-    private lateinit var colorBar: ColorSeekBar
+    private lateinit var colorBar: ColorSeekBar2
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -211,6 +211,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         profileText = findViewById(R.id.profileNameEdit)
         val testText = findViewById<TextView>(R.id.testText)
         colorBar = findViewById(R.id.colorSeekBar)
+        /*
         circleBar.onValueChanged = { a, b ->
             testText.text = "$a $b"
             colorBar.setColors(hueColor(a), hueColor(b))
@@ -218,6 +219,15 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         }
         colorBar.onValueChanged = { _, prefColor ->
             setUIColor(prefColor)
+        }
+
+         */
+
+        val tmpColorBar = findViewById<ColorSeekBar>(R.id.tmp_colorSeekBar)
+        circleBar.onValueChanged = { a, b ->
+            testText.text = "$a $b"
+            colorBar.setColors(hueColor(a), hueColor(b))
+            tmpColorBar.setColors(hueColor(a), hueColor(b))
         }
     }
 
@@ -265,7 +275,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putExtra(PROFILE_NAME_KEY, profileText.text.toString())
             putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0())
             putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1())
-            putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
+            // putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
         }
         setResult(RESULT_OK, intent)
     }
