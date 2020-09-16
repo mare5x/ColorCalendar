@@ -333,17 +333,42 @@ class ColorCircleBar : View {
     private val thumbs = listOf(thumb0, thumb1)
 
     private lateinit var hueShader: SweepGradient
-    private val huePaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val huePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
+    }
+    private val trackPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        color = Color.BLACK
+        strokeWidth = 2f
     }
 
     private var barRadius: Float = 12f  // dp units
     private var padding: Float = 8f  // dp units
     private var thumbDetectionRadius: Float = 4f  // dp units
 
+    private var arcRect = RectF()
+
     override fun onDraw(canvas: Canvas?) {
+        arcRect.apply {
+            left = centerPoint.x - circleRadius
+            top = centerPoint.y - circleRadius
+            right = centerPoint.x + circleRadius
+            bottom = centerPoint.y + circleRadius
+        }
+        var thumb0Angle = (1 - thumb0.progress) * 360f
+        var thumb1Angle = (1 - thumb1.progress) * 360f
+        if (abs(thumb1Angle - thumb0Angle) > 180f) {
+            if (thumb0Angle <= 180f) {
+                thumb1Angle -= 360f
+            } else {
+                thumb0Angle -= 360f
+            }
+        }
+
         canvas?.run {
             drawCircle(centerPoint.x, centerPoint.y, circleRadius, huePaint)
+            drawArc(arcRect, thumb0Angle, thumb1Angle - thumb0Angle, false, trackPaint)
             thumb0.draw(canvas)
             thumb1.draw(canvas)
         }

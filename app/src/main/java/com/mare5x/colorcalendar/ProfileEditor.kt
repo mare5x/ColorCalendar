@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.view.*
 import android.widget.Button
 import android.widget.EditText
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
@@ -209,25 +208,13 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
 
         circleBar = findViewById(R.id.colorCircleBar)
         profileText = findViewById(R.id.profileNameEdit)
-        val testText = findViewById<TextView>(R.id.testText)
         colorBar = findViewById(R.id.colorSeekBar)
-        /*
         circleBar.onValueChanged = { a, b ->
-            testText.text = "$a $b"
             colorBar.setColors(hueColor(a), hueColor(b))
             setUIColor(colorBar.getColor())
         }
         colorBar.onValueChanged = { _, prefColor ->
             setUIColor(prefColor)
-        }
-
-         */
-
-        val tmpColorBar = findViewById<ColorSeekBar>(R.id.tmp_colorSeekBar)
-        circleBar.onValueChanged = { a, b ->
-            testText.text = "$a $b"
-            colorBar.setColors(hueColor(a), hueColor(b))
-            tmpColorBar.setColors(hueColor(a), hueColor(b))
         }
     }
 
