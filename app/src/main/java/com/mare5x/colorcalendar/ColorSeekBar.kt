@@ -268,18 +268,29 @@ class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
     }
 }
 
-class ThumbDrawable : Drawable() {
-    private val thumbPaint: Paint = Paint().apply {
+class ThumbDrawable(accentColor: Int) : Drawable() {
+    private val outerPaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            color = Color.WHITE
+        }
+
+    private val accentPaint = Paint().apply {
         isAntiAlias = true
-        style = Paint.Style.FILL_AND_STROKE
-        color = Color.WHITE
+        style = Paint.Style.STROKE
+        color = accentColor
     }
 
     override fun draw(canvas: Canvas) {
         val cx = bounds.exactCenterX()
         val cy = bounds.exactCenterY()
-        val r = cx - bounds.left
-        canvas.drawCircle(cx, cy, r, thumbPaint)
+        val r = (cx - bounds.left)
+
+        outerPaint.strokeWidth = r * 0.5f
+        accentPaint.strokeWidth = r * 0.25f
+
+        canvas.drawCircle(cx, cy, r * 0.75f, outerPaint)
+        canvas.drawCircle(cx, cy, r * 0.75f, accentPaint)
     }
 
     override fun setAlpha(alpha: Int) {}
@@ -289,17 +300,17 @@ class ThumbDrawable : Drawable() {
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 }
 
-class BarThumb {
+class BarThumb(color: Int) {
     var pointerID: Int = INVALID_POINTER_ID
     var touchPoint = PointF()
 
     var centerPoint = PointF()
-    var progress: Float = 0f
+    var progress: Float = 0f  // in range [0, 1]
 
     var isDragging: Boolean = false
     var radius: Float = 0f  // px units
 
-    private var drawable: Drawable = ThumbDrawable()
+    private var drawable: Drawable = ThumbDrawable(color)
 
     fun updatePosition(circleCenter: PointF, circleRadius: Float) {
         val phi: Float = (progress * 2f * PI).toFloat()
@@ -328,8 +339,13 @@ class ColorCircleBar : View {
 
     private var circleRadius: Float = 0f  // px units
     private val centerPoint: PointF = PointF()  // local px units
-    private val thumb0 = BarThumb()
-    private val thumb1 = BarThumb()
+    private val thumb0 = BarThumb(Color.RED).apply {
+        progress = 0f
+    }
+    private val thumb1 = BarThumb(Color.GREEN).apply {
+        val hsv = FloatArray(3)
+        progress = Color.colorToHSV(Color.GREEN, hsv).let { hsv[0] / 360f }
+    }
     private val thumbs = listOf(thumb0, thumb1)
 
     private lateinit var hueShader: SweepGradient
@@ -339,7 +355,7 @@ class ColorCircleBar : View {
     private val trackPaint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
-        color = Color.BLACK
+        color = Color.GRAY
         strokeWidth = 2f
     }
 
@@ -377,16 +393,12 @@ class ColorCircleBar : View {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
 
+        centerPoint.set(w * 0.5f, h * 0.5f)
+
         val scale = resources.displayMetrics.density
         val barRadiusPx = barRadius * scale
-        centerPoint.set(w * 0.5f, h * 0.5f)
         val a = min(w, h) - 2f * scale * padding
         circleRadius = 0.5f * a - barRadiusPx
-
-        thumb0.radius = barRadiusPx * 0.8f
-        thumb1.radius = barRadiusPx * 0.8f
-        thumb0.updatePosition(centerPoint, circleRadius)
-        thumb1.updatePosition(centerPoint, circleRadius)
 
         hueShader = SweepGradient(centerPoint.x, centerPoint.y, intArrayOf(
             Color.RED, Color.MAGENTA, Color.BLUE, Color.CYAN,
@@ -394,6 +406,11 @@ class ColorCircleBar : View {
         ), null)
         huePaint.shader = hueShader
         huePaint.strokeWidth = 2f * barRadiusPx
+
+        thumb0.radius = barRadiusPx * 0.8f
+        thumb1.radius = barRadiusPx * 0.8f
+        thumb0.updatePosition(centerPoint, circleRadius)
+        thumb1.updatePosition(centerPoint, circleRadius)
     }
 
     @SuppressLint("ClickableViewAccessibility")
