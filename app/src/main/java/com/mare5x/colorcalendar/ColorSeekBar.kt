@@ -7,6 +7,8 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.PaintDrawable
 import android.os.Build
+import android.os.Parcel
+import android.os.Parcelable
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -504,8 +506,59 @@ class ColorCircleBar : View {
         return true
     }
 
+    override fun onSaveInstanceState(): Parcelable? {
+        val state = SavedState(super.onSaveInstanceState())
+        state.thumb0Progress = thumb0.progress
+        state.thumb1Progress = thumb1.progress
+        return state
+    }
+
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        if (!(state is SavedState)) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+
+        super.onRestoreInstanceState(state.superState)
+
+        thumb0.progress = state.thumb0Progress
+        thumb1.progress = state.thumb1Progress
+        onValueChanged(thumb0.progress, thumb1.progress)
+        invalidate()
+    }
+
     fun getColor0(): Int = hueColor(thumb0.progress)
     fun getColor1(): Int = hueColor(thumb1.progress)
+
+    class SavedState : BaseSavedState {
+        var thumb0Progress: Float = 0f
+        var thumb1Progress: Float = 0f
+
+        constructor(superState: Parcelable?) : super(superState)
+
+        constructor(source: Parcel) : super(source) {
+            thumb1Progress = source.readFloat()
+            thumb0Progress = source.readFloat()
+        }
+
+        override fun writeToParcel(out: Parcel, flags: Int) {
+            super.writeToParcel(out, flags)
+            out.writeFloat(thumb0Progress)
+            out.writeFloat(thumb1Progress)
+        }
+
+        companion object {
+            val CREATOR = object : Parcelable.Creator<SavedState> {
+                override fun createFromParcel(parcel: Parcel): SavedState {
+                    return SavedState(parcel)
+                }
+
+                override fun newArray(size: Int): Array<SavedState?> {
+                    return Array(size) { null }
+                }
+            }
+        }
+    }
 }
 
 fun square(x: Float) = x * x

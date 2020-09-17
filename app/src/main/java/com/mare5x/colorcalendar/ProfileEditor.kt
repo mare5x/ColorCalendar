@@ -209,13 +209,17 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         circleBar = findViewById(R.id.colorCircleBar)
         profileText = findViewById(R.id.profileNameEdit)
         colorBar = findViewById(R.id.colorSeekBar)
-        circleBar.onValueChanged = { a, b ->
-            colorBar.setColors(hueColor(a), hueColor(b))
+        circleBar.onValueChanged = { _, _ ->
+            colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
             setUIColor(colorBar.getColor())
         }
         colorBar.onValueChanged = { _, prefColor ->
             setUIColor(prefColor)
         }
+
+        colorBar.setNormProgress(0.8f)
+        colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
+        setUIColor(colorBar.getColor())
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -262,7 +266,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putExtra(PROFILE_NAME_KEY, profileText.text.toString())
             putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0())
             putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1())
-            // putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
+            putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
         }
         setResult(RESULT_OK, intent)
     }
