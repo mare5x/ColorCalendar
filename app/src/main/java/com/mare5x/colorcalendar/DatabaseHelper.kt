@@ -1,6 +1,5 @@
 package com.mare5x.colorcalendar
 
-import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
@@ -9,7 +8,6 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.provider.BaseColumns
 import android.util.Log
-import java.text.SimpleDateFormat
 import java.util.*
 
 
@@ -17,10 +15,6 @@ import java.util.*
 private object DatabaseContract {
     const val DB_NAME = "database.db"
     const val DB_VERSION = 1
-
-    // TODO store dates as longs
-    @SuppressLint("SimpleDateFormat")
-    val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")  // ISO8601
 
     object ProfileEntryDB : BaseColumns {
         const val ID = BaseColumns._ID
@@ -38,7 +32,7 @@ private object DatabaseContract {
                 $MIN_COLOR INTEGER NOT NULL,
                 $MAX_COLOR INTEGER NOT NULL,
                 $PREF_COLOR INTEGER NOT NULL,
-                $CREATION_DATE TEXT NOT NULL
+                $CREATION_DATE INTEGER NOT NULL
             );
         """
     }
@@ -54,7 +48,7 @@ private object DatabaseContract {
             CREATE TABLE $TABLE_NAME(
                 $ID INTEGER PRIMARY KEY,
                 $PROFILE_FK INTEGER NOT NULL,
-                $DATE TEXT,
+                $DATE INTEGER NOT NULL,
                 $VALUE REAL NOT NULL,
                 
                 FOREIGN KEY (${PROFILE_FK}) REFERENCES ${ProfileEntryDB.TABLE_NAME} ($ID)
@@ -76,7 +70,7 @@ data class ProfileEntry(
 data class Entry(
     var id: Long = -1,
     var profile: ProfileEntry? = null,
-    var date: Date? = null,
+    var date: Date = Date(),
     var value: Float = 0f
 ) : Comparable<Entry> {
 
@@ -112,7 +106,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             put(profileDB.MIN_COLOR, profile.minColor)
             put(profileDB.MAX_COLOR, profile.maxColor)
             put(profileDB.PREF_COLOR, profile.prefColor)
-            put(profileDB.CREATION_DATE, DatabaseContract.DATE_FORMAT.format(profile.creationDate))
+            put(profileDB.CREATION_DATE, profile.creationDate.time)
         }
 
         try {
@@ -133,7 +127,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             put(profileDB.MIN_COLOR, profile.minColor)
             put(profileDB.MAX_COLOR, profile.maxColor)
             put(profileDB.PREF_COLOR, profile.prefColor)
-            put(profileDB.CREATION_DATE, DatabaseContract.DATE_FORMAT.format(profile.creationDate))
+            put(profileDB.CREATION_DATE, profile.creationDate.time)
         }
         if (writableDB == null) writableDB = writableDatabase
         writableDB!!.update(profileDB.TABLE_NAME, values, "${profileDB.ID} = ${profile.id}", null)
@@ -157,19 +151,19 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         if (entry.profile == null || entry.profile!!.id < 0) {
             throw Exception("Invalid profile id for $entry")
         }
+        val entryDB = DatabaseContract.EntryDB
 
-        val dateStr = DatabaseContract.DATE_FORMAT.format(entry.date!!)
         val values = ContentValues().apply {
-            put(DatabaseContract.EntryDB.DATE, dateStr)
-            put(DatabaseContract.EntryDB.VALUE, entry.value)
-            put(DatabaseContract.EntryDB.PROFILE_FK, entry.profile!!.id)
+            put(entryDB.DATE, entry.date.time)
+            put(entryDB.VALUE, entry.value)
+            put(entryDB.PROFILE_FK, entry.profile!!.id)
         }
 
         try {
             if (writableDB == null) {
                 writableDB = writableDatabase
             }
-            return writableDB!!.insert(DatabaseContract.EntryDB.TABLE_NAME, null, values)
+            return writableDB!!.insert(entryDB.TABLE_NAME, null, values)
         } catch (e: Exception) {
             Log.e(TAG, "insertEntry: ", e)
         }
@@ -201,8 +195,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
                 profile.minColor = getInt(getColumnIndex(profileDB.MIN_COLOR))
                 profile.maxColor = getInt(getColumnIndex(profileDB.MAX_COLOR))
                 profile.prefColor = getInt(getColumnIndex(profileDB.PREF_COLOR))
-                profile.creationDate = DatabaseContract.DATE_FORMAT.parse(
-                    getString(getColumnIndex(profileDB.CREATION_DATE)))
+                profile.creationDate = Date(getLong(getColumnIndex(profileDB.CREATION_DATE)))
             }
         } catch (e: Exception) {
             Log.e(TAG, "queryProfile: ", e)
@@ -230,7 +223,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
                 profile.minColor = getInt(getColumnIndex(profileDB.MIN_COLOR))
                 profile.maxColor = getInt(getColumnIndex(profileDB.MAX_COLOR))
                 profile.prefColor = getInt(getColumnIndex(profileDB.PREF_COLOR))
-                profile.creationDate = DatabaseContract.DATE_FORMAT.parse(getString(getColumnIndex(profileDB.CREATION_DATE)))
+                profile.creationDate = Date(getLong(getColumnIndex(profileDB.CREATION_DATE)))
                 moveToNext()
             }
             profile
@@ -259,43 +252,10 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             }
 
             val profileFk = cursor.getLong(cursor.getColumnIndex(entryDB.PROFILE_FK))
-            val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
             entry.id = id
             entry.profile = queryProfile(profileFk)
-            entry.date = DatabaseContract.DATE_FORMAT.parse(dateStr)
+            entry.date = Date(cursor.getLong(cursor.getColumnIndex(entryDB.DATE)))
             entry.value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
-        } catch (e: Exception) {
-            Log.e(TAG, "queryEntry: ", e)
-        } finally {
-            cursor?.close()
-        }
-        return entry
-    }
-
-    fun queryEntry(profile: ProfileEntry, date: Date) : Entry? {
-        val entryDB = DatabaseContract.EntryDB
-        val queryStr = """
-            SELECT *
-            FROM ${entryDB.TABLE_NAME}
-            WHERE ${entryDB.PROFILE_FK} = ${profile.id} AND
-                date(${entryDB.DATE}) = date('${DatabaseContract.DATE_FORMAT.format(date)}')
-        """.trimIndent()
-
-        var cursor: Cursor? = null
-        var entry: Entry? = null
-        try {
-            if (readableDB == null) readableDB = readableDatabase
-            cursor = readableDB!!.rawQuery(queryStr, null)
-            cursor.moveToFirst()
-            if (cursor.count > 0) {
-                val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
-                entry = Entry(
-                    id = cursor.getLong(cursor.getColumnIndex(entryDB.ID)),
-                    profile = profile,
-                    date = DatabaseContract.DATE_FORMAT.parse(dateStr),
-                    value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
-                )
-            }
         } catch (e: Exception) {
             Log.e(TAG, "queryEntry: ", e)
         } finally {
@@ -317,11 +277,10 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
         cursor.moveToFirst()
         val res = Array(cursor.count) {
-            val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
             val entry = Entry(
                 id = cursor.getLong(cursor.getColumnIndex(entryDB.ID)),
                 profile = profile,
-                date = DatabaseContract.DATE_FORMAT.parse(dateStr),
+                date = Date(cursor.getLong(cursor.getColumnIndex(entryDB.DATE))),
                 value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
             )
             cursor.moveToNext()
@@ -333,11 +292,10 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
     fun deleteDayEntries(profile: ProfileEntry, dayPosition: Int): Int {
         val entryDB = DatabaseContract.EntryDB
-        val dateStr = DatabaseContract.DATE_FORMAT.format(profile.creationDate)
         val whereStr = """
                 ${entryDB.PROFILE_FK} = ${profile.id} 
                 AND
-                CAST((julianday(${entryDB.DATE}) - julianday(DATE("${dateStr}"))) AS INTEGER) = ${dayPosition}
+                CAST((julianday(${entryDB.DATE} / 1000, 'unixepoch') - julianday(DATE("${profile.creationDate.time}" / 1000, 'unixepoch'))) AS INTEGER) = ${dayPosition}
             """.trimIndent()
         // NOTE 'floor' isn't supported ... Casting only works for non-negative integers, which
         // means profile creation date MUST be earlier than entry date.
