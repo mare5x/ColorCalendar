@@ -15,4 +15,9 @@
         android:id="@+id/action_delete_profile"
         android:orderInCategory="102"
         android:title="@string/delete_profile" />
+    <item
+        android:id="@+id/action_edit_profile"
+        android:orderInCategory="103"
+        android:title="@string/menu_edit_profile" />
+
 </menu>

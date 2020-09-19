@@ -22,6 +22,13 @@ import androidx.core.graphics.green
 import androidx.core.graphics.red
 import kotlin.math.*
 
+
+// Shortest distance between angles alpha and beta.
+fun circleDistance(alpha: Float, beta: Float) : Float {
+    val d = abs(beta - alpha) % 360f
+    return if (d > 180f) (360 - d) else d
+}
+
 fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
     val hsv1 = floatArrayOf(0f, 0f, 0f)
     Color.RGBToHSV(startColor.red, startColor.green, startColor.blue, hsv1)
@@ -42,6 +49,16 @@ fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
     val v = (1.0f - t) * hsv1[2] + t * hsv2[2]
     val hsv = floatArrayOf(h, s, v)
     return Color.HSVToColor(hsv)
+}
+
+fun calcGradientProgress(startColor: Int, endColor: Int, midColor: Int) : Float {
+    val hsvStart = FloatArray(3)
+    val hsvEnd = FloatArray(3)
+    val hsvMid = FloatArray(3)
+    Color.colorToHSV(startColor, hsvStart)
+    Color.colorToHSV(endColor, hsvEnd)
+    Color.colorToHSV(midColor, hsvMid)
+    return circleDistance(hsvStart[0], hsvMid[0]) / circleDistance(hsvStart[0], hsvEnd[0])
 }
 
 fun hueColor(t: Float) = Color.HSVToColor(floatArrayOf(t * 360f, 1.0f, 1.0f))
@@ -350,7 +367,6 @@ class ColorCircleBar : View {
     }
     private val thumbs = listOf(thumb0, thumb1)
 
-    private lateinit var hueShader: SweepGradient
     private val huePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
     }
@@ -402,7 +418,7 @@ class ColorCircleBar : View {
         val a = min(w, h) - 2f * scale * padding
         circleRadius = 0.5f * a - barRadiusPx
 
-        hueShader = SweepGradient(centerPoint.x, centerPoint.y, intArrayOf(
+        val hueShader = SweepGradient(centerPoint.x, centerPoint.y, intArrayOf(
             Color.RED, Color.MAGENTA, Color.BLUE, Color.CYAN,
             Color.GREEN, Color.YELLOW, Color.RED
         ), null)
@@ -506,6 +522,23 @@ class ColorCircleBar : View {
         return true
     }
 
+    fun getColor0(): Int = hueColor(thumb0.progress)
+    fun getColor1(): Int = hueColor(thumb1.progress)
+
+    fun setColor0(color: Int) {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        thumb0.progress = hsv[0] / 360f
+        invalidate()
+    }
+
+    fun setColor1(color: Int) {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        thumb1.progress = hsv[0] / 360f
+        invalidate()
+    }
+
     override fun onSaveInstanceState(): Parcelable? {
         val state = SavedState(super.onSaveInstanceState())
         state.thumb0Progress = thumb0.progress
@@ -526,9 +559,6 @@ class ColorCircleBar : View {
         onValueChanged(thumb0.progress, thumb1.progress)
         invalidate()
     }
-
-    fun getColor0(): Int = hueColor(thumb0.progress)
-    fun getColor1(): Int = hueColor(thumb1.progress)
 
     class SavedState : BaseSavedState {
         var thumb0Progress: Float = 0f

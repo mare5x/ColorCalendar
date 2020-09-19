@@ -18,6 +18,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.*
+import kotlin.math.max
 
 // NOTE: for constraint layout see the developer guide at:
 // https://developer.android.com/reference/androidx/constraintlayout/widget/ConstraintLayout
@@ -27,6 +28,7 @@ import java.util.*
 class MainViewModel(val db: DatabaseHelper) : ViewModel() {
     private val currentProfile = MutableLiveData<ProfileEntry>()
     private val insertedProfile = MutableLiveData<ProfileEntry>()
+    private val updatedProfile = MutableLiveData<ProfileEntry>()
     private val deletedProfile = MutableLiveData<ProfileEntry>()
     private val insertedEntry = MutableLiveData<Entry>()
 
@@ -41,6 +43,13 @@ class MainViewModel(val db: DatabaseHelper) : ViewModel() {
             profile.creationDate = Date()
             profile.id = db.insertProfile(profile)
             insertedProfile.postValue(profile)
+        }
+    }
+    fun getUpdatedProfile() = updatedProfile
+    fun updateProfile(profile: ProfileEntry) {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.updateProfile(profile)
+            updatedProfile.postValue(profile)
         }
     }
     fun getDeletedProfile() = deletedProfile
@@ -69,7 +78,7 @@ class MainViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.F
 }
 
 
-class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener, ProfileEditorDialogFragment.ProfileEditorListener, ProfileDeleteDialog.ProfileDeleteListener {
+class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener, ProfileDeleteDialog.ProfileDeleteListener {
 
     private lateinit var db: DatabaseHelper
     private lateinit var viewPager: ViewPager2
@@ -85,7 +94,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
 
         db = DatabaseHelper(this)
 
-        findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
+        findViewById<FloatingActionButton>(R.id.fab).setOnClickListener {
             val dialog = EntryEditorDialog.create(mainViewModel.getCurrentProfile().value!!)
             dialog.show(supportFragmentManager, "entryEditor")
         }
@@ -99,7 +108,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
 
         val profileSpinner = findViewById<Spinner>(R.id.profileSpinner)
 
-        val profileSpinnerAdapter = ProfileSpinnerAdapter(actionBar?.themedContext ?: this)
+        val profileSpinnerAdapter = ProfileSpinnerAdapter(actionBar?.themedContext ?: this, profilesViewModel.getProfiles().value ?: emptyList())
         // https://developer.android.com/reference/android/widget/Spinner#setAdapter(android.widget.SpinnerAdapter)
         // Popup theme!
         profileSpinner.adapter = profileSpinnerAdapter
@@ -124,9 +133,18 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
 
         mainViewModel.getInsertedProfile().observe(this) { profile ->
             profilesViewModel.addProfile(profile)
-            profileSpinnerAdapter.add(profile)
             val position = profilesViewModel.getPosition(profile)
             profileFragmentAdapter.notifyItemInserted(position)
+            profileSpinnerAdapter.notifyDataSetChanged()
+
+            changeProfile(profile)
+        }
+
+        mainViewModel.getUpdatedProfile().observe(this) { profile ->
+            val position = profilesViewModel.getPosition(profile)
+            profilesViewModel.setProfile(profile, position)
+            profileFragmentAdapter.notifyItemChanged(position)
+            profileSpinnerAdapter.notifyDataSetChanged()
 
             changeProfile(profile)
         }
@@ -134,17 +152,16 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         mainViewModel.getDeletedProfile().observe(this) { profile ->
             val index = profilesViewModel.getPosition(profile)
             profilesViewModel.removeProfile(profile)
-            profileSpinnerAdapter.remove(profile)
             profileFragmentAdapter.notifyItemRemoved(index)
+            profileSpinnerAdapter.notifyDataSetChanged()
 
-            val newProfile = profilesViewModel.getProfile(Math.max(0, index - 1))
+            val newProfile = profilesViewModel.getProfile(max(0, index - 1))
             changeProfile(newProfile)
         }
 
         profilesViewModel.getProfiles().observe(this) { profiles ->
             if (profiles.isNotEmpty()) {
-                profileSpinnerAdapter.clear()
-                profileSpinnerAdapter.addAll(profiles)
+                profileSpinnerAdapter.profiles = profiles
                 profileSpinnerAdapter.notifyDataSetChanged()
 
                 profileFragmentAdapter.profiles = profiles
@@ -155,8 +172,9 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         mainViewModel.getCurrentProfile().observe(this) { profile ->
             onProfileChanged(profile)
 
-            profileSpinner.setSelection(profileSpinnerAdapter.getPosition(profile))
-            viewPager.setCurrentItem(profileFragmentAdapter.profiles.indexOf(profile))
+            val position = profilesViewModel.getPosition(profile)
+            profileSpinner.setSelection(position)
+            viewPager.currentItem = position
         }
     }
 
@@ -182,6 +200,22 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                 dialog.show(supportFragmentManager, "profileDelete")
                 true
             }
+            R.id.action_edit_profile -> {
+                val profile = mainViewModel.getCurrentProfile().value
+                val intent = Intent(this, ProfileEditorActivity::class.java)
+                if (profile != null) {
+                    intent.run {
+                        putExtra(ProfileEditorActivity.PROFILE_ID_KEY, profile.id)
+                        putExtra(ProfileEditorActivity.PROFILE_NAME_KEY, profile.name)
+                        putExtra(ProfileEditorActivity.PROFILE_MIN_COLOR_KEY, profile.minColor)
+                        putExtra(ProfileEditorActivity.PROFILE_MAX_COLOR_KEY, profile.maxColor)
+                        putExtra(ProfileEditorActivity.PROFILE_PREF_COLOR_KEY, profile.prefColor)
+                        putExtra(ProfileEditorActivity.PROFILE_CREATION_DATE_KEY, profile.creationDate.time)
+                    }
+                }
+                startActivityForResult(intent, PROFILE_EDITOR_CODE)
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -193,28 +227,26 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                 val bundle = data?.extras
                 if (bundle != null) {
                     val profile = ProfileEntry()
+                    profile.id = bundle.getLong(ProfileEditorActivity.PROFILE_ID_KEY, -1L)
                     profile.name = bundle.getString(ProfileEditorActivity.PROFILE_NAME_KEY).toString()
                     profile.minColor = bundle.getInt(ProfileEditorActivity.PROFILE_MIN_COLOR_KEY)
                     profile.maxColor = bundle.getInt(ProfileEditorActivity.PROFILE_MAX_COLOR_KEY)
                     profile.prefColor = bundle.getInt(ProfileEditorActivity.PROFILE_PREF_COLOR_KEY)
-                    mainViewModel.insertProfile(profile)
+                    profile.creationDate = bundle.getLong(ProfileEditorActivity.PROFILE_CREATION_DATE_KEY, -1L).let { date ->
+                        if (date < 0) Date()
+                        else Date(date)
+                    }
+                    if (profile.id == -1L) {
+                        mainViewModel.insertProfile(profile)
+                    } else {
+                        mainViewModel.updateProfile(profile)
+                    }
                 }
             }
         }
     }
 
-    override fun onProfileConfirm(name: String, minColor: Int, maxColor: Int, prefColor: Int) {
-        mainViewModel.insertProfile(ProfileEntry(
-            name = name,
-            minColor = minColor,
-            maxColor = maxColor,
-            prefColor = prefColor
-        ))
-    }
-
-    override fun onProfileColorChanged(color: Int) = setUIColor(color)
-
-    fun setUIColor(color: Int) {
+    private fun setUIColor(color: Int) {
         supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val hsv = floatArrayOf(0f, 0f, 0f)
@@ -224,16 +256,11 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         }
     }
 
-    override fun onProfileDismiss() {
-        // Restore color
-        setUIColor(mainViewModel.getCurrentProfile().value!!.prefColor)
-    }
-
     fun changeProfile(profile: ProfileEntry) {
         mainViewModel.setCurrentProfile(profile)
     }
 
-    fun onProfileChanged(profile: ProfileEntry) {
+    private fun onProfileChanged(profile: ProfileEntry) {
         setUIColor(profile.prefColor)
     }
 

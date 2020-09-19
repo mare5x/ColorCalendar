@@ -19,4 +19,7 @@
 
     <string name="delete_profile">Delete profile</string>
     <string name="new_profile">New profile</string>
+    <string name="profile_name_edit">Profile name</string>
+    <string name="add_profile">Add profile</string>
+    <string name="menu_edit_profile">Edit profile</string>
 </resources>

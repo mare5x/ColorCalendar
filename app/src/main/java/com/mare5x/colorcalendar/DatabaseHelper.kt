@@ -23,6 +23,7 @@ private object DatabaseContract {
     val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")  // ISO8601
 
     object ProfileEntryDB : BaseColumns {
+        const val ID = BaseColumns._ID
         const val TABLE_NAME = "profile"
         const val PROFILE_NAME = "name"
         const val MIN_COLOR = "min_color"
@@ -32,7 +33,7 @@ private object DatabaseContract {
 
         const val DB_CREATE = """
             CREATE TABLE ${TABLE_NAME}(
-                ${BaseColumns._ID} INTEGER PRIMARY KEY,
+                $ID INTEGER PRIMARY KEY,
                 $PROFILE_NAME TEXT NOT NULL,
                 $MIN_COLOR INTEGER NOT NULL,
                 $MAX_COLOR INTEGER NOT NULL,
@@ -43,6 +44,7 @@ private object DatabaseContract {
     }
 
     object EntryDB : BaseColumns {
+        const val ID = BaseColumns._ID
         const val TABLE_NAME = "entry"
         const val DATE = "_date"
         const val VALUE = "value"
@@ -50,12 +52,12 @@ private object DatabaseContract {
 
         const val DB_CREATE = """
             CREATE TABLE $TABLE_NAME(
-                ${BaseColumns._ID} INTEGER PRIMARY KEY,
+                $ID INTEGER PRIMARY KEY,
                 $PROFILE_FK INTEGER NOT NULL,
                 $DATE TEXT,
                 $VALUE REAL NOT NULL,
                 
-                FOREIGN KEY (${PROFILE_FK}) REFERENCES ${ProfileEntryDB.TABLE_NAME} (${BaseColumns._ID})
+                FOREIGN KEY (${PROFILE_FK}) REFERENCES ${ProfileEntryDB.TABLE_NAME} ($ID)
             );
         """
     }
@@ -90,15 +92,6 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     private var readableDB: SQLiteDatabase? = null
 
     // TODO execute database commands in a coroutine
-    init {
-        /*
-        insertProfile(ProfileEntry(name="default", minColor=Color.RED, maxColor=Color.GREEN, creationDate=DatabaseContract.DATE_FORMAT.parse("2020-07-20 12:42:02")))
-        val profile = queryProfile(1)
-        val id = insertEntry(Entry(profile=profile, date=DatabaseContract.DATE_FORMAT.parse("2020-07-20 23:00:00"), value=0.1f))
-        insertEntry(Entry(profile=profile, date=Date(), value=0.5f))
-        Log.i(TAG, queryEntry(id.toInt()).toString())
-        */
-    }
 
     override fun onCreate(db: SQLiteDatabase) {
         // "Multiple statements separated by semicolons are not supported."
@@ -133,6 +126,20 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         return -1
     }
 
+    fun updateProfile(profile: ProfileEntry): Long {
+        val profileDB = DatabaseContract.ProfileEntryDB
+        val values = ContentValues().apply {
+            put(profileDB.PROFILE_NAME, profile.name)
+            put(profileDB.MIN_COLOR, profile.minColor)
+            put(profileDB.MAX_COLOR, profile.maxColor)
+            put(profileDB.PREF_COLOR, profile.prefColor)
+            put(profileDB.CREATION_DATE, DatabaseContract.DATE_FORMAT.format(profile.creationDate))
+        }
+        if (writableDB == null) writableDB = writableDatabase
+        writableDB!!.update(profileDB.TABLE_NAME, values, "${profileDB.ID} = ${profile.id}", null)
+        return profile.id
+    }
+
     fun deleteProfile(profile: ProfileEntry) {
         if (writableDB == null) writableDB = writableDatabase
         writableDB!!.delete(
@@ -141,7 +148,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             null)
         writableDB!!.delete(
             DatabaseContract.ProfileEntryDB.TABLE_NAME,
-            "${BaseColumns._ID} = ${profile.id}",
+            "${DatabaseContract.ProfileEntryDB.ID} = ${profile.id}",
             null
         )
     }
@@ -218,7 +225,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         val res = Array(cursor.count) {
             val profile = ProfileEntry()
             with(cursor) {
-                profile.id = getLong(getColumnIndex(BaseColumns._ID))
+                profile.id = getLong(getColumnIndex(profileDB.ID))
                 profile.name = getString(getColumnIndex(profileDB.PROFILE_NAME))
                 profile.minColor = getInt(getColumnIndex(profileDB.MIN_COLOR))
                 profile.maxColor = getInt(getColumnIndex(profileDB.MAX_COLOR))
@@ -283,7 +290,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             if (cursor.count > 0) {
                 val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
                 entry = Entry(
-                    id = cursor.getLong(cursor.getColumnIndex(BaseColumns._ID)),
+                    id = cursor.getLong(cursor.getColumnIndex(entryDB.ID)),
                     profile = profile,
                     date = DatabaseContract.DATE_FORMAT.parse(dateStr),
                     value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))
@@ -312,7 +319,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         val res = Array(cursor.count) {
             val dateStr = cursor.getString(cursor.getColumnIndex(entryDB.DATE))
             val entry = Entry(
-                id = cursor.getLong(cursor.getColumnIndex(BaseColumns._ID)),
+                id = cursor.getLong(cursor.getColumnIndex(entryDB.ID)),
                 profile = profile,
                 date = DatabaseContract.DATE_FORMAT.parse(dateStr),
                 value = cursor.getFloat(cursor.getColumnIndex(entryDB.VALUE))

@@ -1,14 +1,13 @@
 package com.mare5x.colorcalendar
 
-import android.app.AlertDialog
-import android.app.Dialog
 import android.content.Context
-import android.os.Bundle
+import android.content.res.Resources
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
+import android.widget.BaseAdapter
 import android.widget.TextView
-import androidx.fragment.app.DialogFragment
+import androidx.appcompat.widget.ThemedSpinnerAdapter
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.MutableLiveData
@@ -37,16 +36,18 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
         }
     }
 
-    fun getSize() = profilesData.value?.size ?: 0
-
     fun getProfile(position: Int): ProfileEntry {
-        return profilesData.value!!.get(position)
+        return profilesData.value!![position]
     }
 
     fun getProfile(id: Long): ProfileEntry? {
         return profilesData.value!!.find {
             it.id == id
         }
+    }
+
+    fun setProfile(profile: ProfileEntry, position: Int) {
+        profilesData.value!![position] = profile
     }
 
     fun addProfile(profile: ProfileEntry) {
@@ -73,28 +74,54 @@ class ProfilesViewModelFactory(private val db: DatabaseHelper) : ViewModelProvid
 }
 
 
-// TODO use BaseAdapter ...
-class ProfileSpinnerAdapter(context: Context) :
-    ArrayAdapter<ProfileEntry>(context, R.layout.profile_spinner_item, R.id.profileText)
-{
-    init {
-        setDropDownViewResource(R.layout.profile_spinner_dropdown_item)
+class ProfileSpinnerAdapter(
+    val context: Context,
+    var profiles: List<ProfileEntry>
+) : BaseAdapter(), ThemedSpinnerAdapter {
+
+    // Theming support for popupTheme
+    // https://developer.android.com/reference/androidx/appcompat/widget/ThemedSpinnerAdapter.Helper
+    private val dropDownHelper = ThemedSpinnerAdapter.Helper(context)
+
+    val inflater = LayoutInflater.from(context)
+
+    override fun getCount(): Int = profiles.size
+
+    override fun getItem(position: Int): ProfileEntry {
+        return profiles[position]
     }
 
+    override fun getItemId(position: Int): Long = profiles[position].id
+
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val view = super.getView(position, convertView, parent)
+        val view =
+            if (convertView == null)
+                inflater.inflate(R.layout.profile_spinner_item, parent, false)
+            else convertView
+
         val text = view.findViewById<TextView>(R.id.profileText)
-        val profile = getItem(position) as ProfileEntry
+        val profile = getItem(position)
         text.text = profile.name
         return view
     }
 
     override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val view = super.getDropDownView(position, convertView, parent)
+        val view =
+            if (convertView == null)
+                dropDownHelper.dropDownViewInflater.inflate(R.layout.profile_spinner_dropdown_item, parent, false)
+            else convertView
         val text = view.findViewById<TextView>(R.id.profileText)
-        val profile = getItem(position) as ProfileEntry
+        val profile = getItem(position)
         text.text = profile.name
         return view
+    }
+
+    override fun setDropDownViewTheme(theme: Resources.Theme?) {
+        dropDownHelper.dropDownViewTheme = theme
+    }
+
+    override fun getDropDownViewTheme(): Resources.Theme? {
+        return dropDownHelper.dropDownViewTheme
     }
 }
 

@@ -56,13 +56,14 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
     fun getProfile() = profileData
     fun getDayChanged() = dayChanged
 
-    private fun setProfile(profile: ProfileEntry) {
+    fun setProfile(profile: ProfileEntry) {
         profileData.value = profile
-        fetchGridEntries(profile)
     }
 
-    fun setProfile(profileId: Long) {
-        setProfile(db.queryProfile(profileId))
+    fun initProfile(profileId: Long) {
+        val profile = db.queryProfile(profileId)
+        profileData.value = profile
+        fetchGridEntries(profile)
     }
 
     private fun fetchGridEntries(profile: ProfileEntry) {
@@ -211,7 +212,7 @@ class ColorGridFragment : Fragment() {
 
         // Fragment created using companion 'create' function with bundle arguments (profile id).
         val profileId = requireArguments().getLong(PROFILE_ID_KEY)
-        gridModel.setProfile(profileId)
+        gridModel.initProfile(profileId)
 
         adapter = ColorRectAdapter(gridModel.getProfile().value!!)
         grid = view.findViewById(R.id.colorGrid)
@@ -228,6 +229,14 @@ class ColorGridFragment : Fragment() {
                 }
 
                 adapter.notifyItemChanged(position)
+            }
+        }
+
+        mainModel.getUpdatedProfile().observe(viewLifecycleOwner) { profile ->
+            if (profile.id == profileId) {
+                gridModel.setProfile(profile)
+                adapter.profile = profile
+                adapter.notifyDataSetChanged()
             }
         }
 

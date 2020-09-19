@@ -3,120 +3,17 @@ package com.mare5x.colorcalendar
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
-import android.view.*
-import android.widget.Button
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
-
-class ProfileEditorDialogFragment : DialogFragment() {
-    interface ProfileEditorListener {
-        fun onProfileConfirm(name: String, minColor: Int, maxColor: Int, prefColor: Int)
-        fun onProfileColorChanged(color: Int)
-        fun onProfileDismiss()
-    }
-
-    private lateinit var minColorPicker: ColorPickerBar
-    private lateinit var maxColorPicker: ColorPickerBar
-
-    private var listener: ProfileEditorListener? = null
-
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.dialog_profile_editor, container, false)
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        minColorPicker = view.findViewById(R.id.minColorPicker)
-        minColorPicker.showFullHue()
-
-        maxColorPicker = view.findViewById(R.id.maxColorPicker)
-        maxColorPicker.showFullHue()
-
-        val profileColorsBar = view.findViewById<ColorSeekBar>(R.id.profileColorsBar)
-        profileColorsBar.setColors(minColorPicker.getColor(), maxColorPicker.getColor())
-
-        minColorPicker.onValueChanged = { _, color ->
-            profileColorsBar.setColors(color, maxColorPicker.getColor())
-            listener?.onProfileColorChanged(profileColorsBar.getColor())
-        }
-        maxColorPicker.onValueChanged = { _, color ->
-            profileColorsBar.setColors(minColorPicker.getColor(), color)
-            listener?.onProfileColorChanged(profileColorsBar.getColor())
-        }
-
-        profileColorsBar.onValueChanged = { _, color ->
-            listener?.onProfileColorChanged(color)
-        }
-
-        val nameEditor = view.findViewById<EditText>(R.id.profileNameEdit)
-
-        val cancelButton = view.findViewById<Button>(R.id.cancelButton)
-        cancelButton.setOnClickListener {
-            if (showsDialog)
-                dismiss()
-        }
-
-        val confirmButton = view.findViewById<Button>(R.id.confirmButton)
-        confirmButton.setOnClickListener {
-            listener?.onProfileConfirm(nameEditor.text.toString(),
-                minColorPicker.getColor(),
-                maxColorPicker.getColor(),
-                profileColorsBar.getColor())
-            if (showsDialog)
-                dismiss()
-        }
-    }
-
-    override fun onDismiss(dialog: DialogInterface) {
-        super.onDismiss(dialog)
-
-        listener?.onProfileDismiss()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        outState.run {
-            putFloat(STATE_MIN_COLOR, minColorPicker.getNormProgress())
-            putFloat(STATE_MAX_COLOR, maxColorPicker.getNormProgress())
-        }
-        super.onSaveInstanceState(outState)
-    }
-
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-
-        if (savedInstanceState != null) {
-            with(savedInstanceState) {
-                // TODO ONLY MAX BAR IS RESTORED, MIN BAR IS RETARDED
-                // ASDFAPODIUQWEOIRUQPOIWERUQWUROPI
-                minColorPicker.setNormProgress(getFloat(STATE_MIN_COLOR))
-                maxColorPicker.setNormProgress(getFloat(STATE_MAX_COLOR))
-            }
-        }
-    }
-
-    override fun onAttach(context: Context) {
-        super.onAttach(context)
-        listener = context as? ProfileEditorListener
-    }
-
-    companion object {
-        private const val STATE_MIN_COLOR = "state_min_color"
-        private const val STATE_MAX_COLOR = "state_max_color"
-    }
-}
 
 
 class ProfileDeleteDialog : DialogFragment() {
@@ -192,6 +89,8 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     private lateinit var circleBar: ColorCircleBar
     private lateinit var profileText: EditText
     private lateinit var colorBar: ColorSeekBar2
+    private var profileId: Long = -1L  // Used when editing profile.
+    private var profileCreationDate: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -217,8 +116,30 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             setUIColor(prefColor)
         }
 
+        profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
+        // For now just relay the creation date ... (when editing)
+        profileCreationDate = intent.getLongExtra(PROFILE_CREATION_DATE_KEY, -1L)
+
+        intent.getStringExtra(PROFILE_NAME_KEY).let { name ->
+            if (name != null) {
+                profileText.setText(name)
+            }
+        }
+        intent.getIntExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0()).let { color ->
+            circleBar.setColor0(color)
+        }
+        intent.getIntExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1()).let { color ->
+            circleBar.setColor1(color)
+        }
+
         colorBar.setNormProgress(0.8f)
         colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
+
+        intent.getIntExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor()).let { color ->
+            colorBar.setNormProgress(
+                calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), color))
+        }
+
         setUIColor(colorBar.getColor())
     }
 
@@ -263,10 +184,12 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         Toast.makeText(this, "Profile created", Toast.LENGTH_SHORT).show()
 
         val intent = Intent().apply {
+            putExtra(PROFILE_ID_KEY, profileId)
             putExtra(PROFILE_NAME_KEY, profileText.text.toString())
             putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0())
             putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1())
             putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
+            putExtra(PROFILE_CREATION_DATE_KEY, profileCreationDate)
         }
         setResult(RESULT_OK, intent)
     }
@@ -282,9 +205,11 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     }
 
     companion object {
+        const val PROFILE_ID_KEY = "profile_id_key"
         const val PROFILE_NAME_KEY = "profile_name_key"
         const val PROFILE_MIN_COLOR_KEY = "profile_min_color_key"
         const val PROFILE_MAX_COLOR_KEY = "profile_max_color_key"
         const val PROFILE_PREF_COLOR_KEY = "profile_pref_color_key"
+        const val PROFILE_CREATION_DATE_KEY = "profile_creation_date_key"
     }
 }
