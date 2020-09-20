@@ -112,9 +112,14 @@ class ProfileSpinnerAdapter(
             if (convertView == null)
                 dropDownHelper.dropDownViewInflater.inflate(R.layout.profile_spinner_dropdown_item, parent, false)
             else convertView
-        val text = view.findViewById<TextView>(R.id.profileText)
+
         val profile = getItem(position)
+
+        val text = view.findViewById<TextView>(R.id.profileText)
         text.text = profile.name
+        val color = view.findViewById<ColorRect>(R.id.profileColor)
+        color.color = profile.prefColor
+
         return view
     }
 

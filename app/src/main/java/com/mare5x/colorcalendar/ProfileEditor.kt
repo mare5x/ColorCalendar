@@ -64,9 +64,10 @@ class ProfileDiscardDialog : DialogFragment() {
     private var listener: ProfileDiscardListener? = null
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val msg = arguments?.getString(MSG_KEY, "Discard this profile?")
         return activity?.let {
             val builder = AlertDialog.Builder(it)
-            builder.setMessage("Discard this profile?")
+            builder.setMessage(msg)
                 .setPositiveButton("Discard") { _, _ ->
                     listener?.onProfileDiscard()
                 }
@@ -81,6 +82,18 @@ class ProfileDiscardDialog : DialogFragment() {
     override fun onAttach(context: Context) {
         super.onAttach(context)
         listener = context as? ProfileDiscardListener
+    }
+
+    companion object {
+        const val MSG_KEY = "msg_key"
+
+        fun create(msg: String): ProfileDiscardDialog {
+            val d = ProfileDiscardDialog()
+            d.arguments = Bundle().apply {
+                putString(MSG_KEY, msg)
+            }
+            return d
+        }
     }
 }
 
@@ -180,7 +193,8 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     }
 
     private fun attemptDismiss() {
-        val dialog = ProfileDiscardDialog()
+        val msg = if (profileId < 0) "Discard this profile?" else "Discard changes?"
+        val dialog = ProfileDiscardDialog.create(msg)
         dialog.show(supportFragmentManager, "profileDiscard")
     }
 
