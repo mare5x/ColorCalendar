@@ -113,7 +113,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             if (writableDB == null) {
                 writableDB = writableDatabase
             }
-            return writableDB!!.insert(DatabaseContract.ProfileEntryDB.TABLE_NAME, null, values)
+            return writableDB!!.insertOrThrow(profileDB.TABLE_NAME, null, values)
         } catch (e: Exception) {
             Log.e(TAG, "insertProfile: ", e)
         }
@@ -163,7 +163,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             if (writableDB == null) {
                 writableDB = writableDatabase
             }
-            return writableDB!!.insert(entryDB.TABLE_NAME, null, values)
+            return writableDB!!.insertOrThrow(entryDB.TABLE_NAME, null, values)
         } catch (e: Exception) {
             Log.e(TAG, "insertEntry: ", e)
         }

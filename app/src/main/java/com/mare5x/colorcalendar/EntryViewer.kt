@@ -61,7 +61,7 @@ class EntryAdapter(
             is EntryViewHolder -> {
                 val entry = entries[position]
                 holder.colorItem.color = calcGradientColor(profile.minColor, profile.maxColor, entry.value)
-                holder.entryText.text = entryDateFormat.format(entry.date!!)
+                holder.entryText.text = entryDateFormat.format(entry.date)
             }
             is AdderViewHolder -> {
                 holder.button.setOnClickListener {
@@ -189,12 +189,12 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
     override fun onEntryCancel() {}
 
     override fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) {
+        val s = Calendar.getInstance().get(Calendar.SECOND)
         val t = Calendar.getInstance().apply {
             time = profile.creationDate
-            set(Calendar.SECOND, 0)
+            set(Calendar.SECOND, s)
             set(Calendar.MINUTE, minute)
             set(Calendar.HOUR_OF_DAY, hourOfDay)
-            set(Calendar.MILLISECOND, 0)
             add(Calendar.DAY_OF_MONTH, dayPosition)
         }
         val entry = Entry(

@@ -285,6 +285,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
     override fun onEntryCancel() {}
 
     override fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) {
+        // Entries added using the floating action button always refer to today's date.
         val t = Calendar.getInstance().apply {
             set(Calendar.MINUTE, minute)
             set(Calendar.HOUR_OF_DAY, hourOfDay)
