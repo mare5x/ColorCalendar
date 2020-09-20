@@ -86,6 +86,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
     private val mainViewModel: MainViewModel by viewModels { MainViewModelFactory(db) }
     private val profilesViewModel: ProfilesViewModel by viewModels { ProfilesViewModelFactory(db) }
 
+    private var currentProfile: ProfileEntry? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,7 +96,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         db = DatabaseHelper(this)
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener {
-            val dialog = EntryEditorDialog.create(mainViewModel.getCurrentProfile().value!!)
+            val dialog = EntryEditorDialog.create(currentProfile!!)
             dialog.show(supportFragmentManager, "entryEditor")
         }
 
@@ -127,7 +128,8 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         viewPager.adapter = profileFragmentAdapter
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
-                changeProfile(profilesViewModel.getProfile(position))
+                if (position < profilesViewModel.getSize())
+                    changeProfile(profilesViewModel.getProfile(position))
             }
         })
 
@@ -155,22 +157,30 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
             profileFragmentAdapter.notifyItemRemoved(index)
             profileSpinnerAdapter.notifyDataSetChanged()
 
-            val newProfile = profilesViewModel.getProfile(max(0, index - 1))
-            changeProfile(newProfile)
+            if (profilesViewModel.getSize() > 0) {
+                val newProfile = profilesViewModel.getProfile(max(0, index - 1))
+                changeProfile(newProfile)
+            } else {
+                // Last profile has just been deleted. Prompt for a new profile.
+                forcePromptNewProfile()
+            }
         }
 
         profilesViewModel.getProfiles().observe(this) { profiles ->
-            if (profiles.isNotEmpty()) {
-                profileSpinnerAdapter.profiles = profiles
-                profileSpinnerAdapter.notifyDataSetChanged()
+            profileSpinnerAdapter.profiles = profiles
+            profileSpinnerAdapter.notifyDataSetChanged()
 
-                profileFragmentAdapter.profiles = profiles
-                profileFragmentAdapter.notifyDataSetChanged()
+            profileFragmentAdapter.profiles = profiles
+            profileFragmentAdapter.notifyDataSetChanged()
+
+            if (profiles.isEmpty()) {
+                forcePromptNewProfile()
             }
         }
 
         mainViewModel.getCurrentProfile().observe(this) { profile ->
-            onProfileChanged(profile)
+            currentProfile = profile
+            setUIColor(profile.prefColor)
 
             val position = profilesViewModel.getPosition(profile)
             profileSpinner.setSelection(position)
@@ -196,12 +206,12 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                 true
             }
             R.id.action_delete_profile -> {
-                val dialog = ProfileDeleteDialog.create(mainViewModel.getCurrentProfile().value!!)
+                val dialog = ProfileDeleteDialog.create(currentProfile!!)
                 dialog.show(supportFragmentManager, "profileDelete")
                 true
             }
             R.id.action_edit_profile -> {
-                val profile = mainViewModel.getCurrentProfile().value
+                val profile = currentProfile
                 val intent = Intent(this, ProfileEditorActivity::class.java)
                 if (profile != null) {
                     intent.run {
@@ -260,13 +270,15 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         mainViewModel.setCurrentProfile(profile)
     }
 
-    private fun onProfileChanged(profile: ProfileEntry) {
-        setUIColor(profile.prefColor)
+    private fun forcePromptNewProfile() {
+        val intent = Intent(this, ProfileEditorActivity::class.java)
+        intent.putExtra(ProfileEditorActivity.FORCE_SELECTION_KEY, true)
+        startActivityForResult(intent, PROFILE_EDITOR_CODE)
     }
 
     override fun onProfileDelete() {
         mainViewModel.run {
-            deleteProfile(getCurrentProfile().value!!)
+            deleteProfile(currentProfile!!)
         }
     }
 
@@ -277,9 +289,8 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
             set(Calendar.MINUTE, minute)
             set(Calendar.HOUR_OF_DAY, hourOfDay)
         }
-        val profile = mainViewModel.getCurrentProfile().value!!
         val entry = Entry(
-            profile = profile,
+            profile = currentProfile,
             value = value,
             date = t.time
         )

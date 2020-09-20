@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 typealias ProfileList = MutableList<ProfileEntry>
 
 class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
-    private val profilesData = MutableLiveData<ProfileList>(mutableListOf())
+    private val profilesData = MutableLiveData<ProfileList>()
 
     init {
         fetchProfiles()
@@ -35,6 +35,8 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
             profilesData.postValue(profiles.toMutableList())
         }
     }
+
+    fun getSize(): Int = profilesData.value?.size ?: 0
 
     fun getProfile(position: Int): ProfileEntry {
         return profilesData.value!![position]

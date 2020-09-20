@@ -91,6 +91,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     private lateinit var colorBar: ColorSeekBar2
     private var profileId: Long = -1L  // Used when editing profile.
     private var profileCreationDate: Long = -1L
+    private var forceSelection = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,11 +99,13 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         setContentView(R.layout.activity_profile_editor)
         setSupportActionBar(findViewById(R.id.toolbar))
 
+        forceSelection = intent.getBooleanExtra(FORCE_SELECTION_KEY, false)
+
         // Add back arrow to toolbar (shouldn't it be automatic???)
         val actionBar = supportActionBar
         if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(true)
-            actionBar.setDisplayShowHomeEnabled(true)
+            actionBar.setDisplayHomeAsUpEnabled(!forceSelection)
+            actionBar.setDisplayShowHomeEnabled(!forceSelection)
         }
 
         circleBar = findViewById(R.id.colorCircleBar)
@@ -164,7 +167,12 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     }
 
     override fun onBackPressed() {
-        attemptDismiss()
+        if (forceSelection) {
+            confirmProfile()
+            dismiss()
+        } else {
+            attemptDismiss()
+        }
     }
 
     override fun onProfileDiscard() {
@@ -181,7 +189,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     }
 
     private fun confirmProfile() {
-        Toast.makeText(this, "Profile created", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, """Profile ${if (profileId < 0) "created" else "updated"}""", Toast.LENGTH_SHORT).show()
 
         val intent = Intent().apply {
             putExtra(PROFILE_ID_KEY, profileId)
@@ -205,6 +213,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     }
 
     companion object {
+        const val FORCE_SELECTION_KEY = "force_selection_key"
         const val PROFILE_ID_KEY = "profile_id_key"
         const val PROFILE_NAME_KEY = "profile_name_key"
         const val PROFILE_MIN_COLOR_KEY = "profile_min_color_key"

@@ -76,11 +76,9 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
             repeat(size) { dayEntries.add(sortedSetOf()) }
 
             entries.forEach {
-                if (it.date != null) {
-                    val day = calcDayDifference(profile.creationDate, it.date!!)
-                    if (day >= 0 && day < size)
-                        dayEntries[day].add(it)
-                }
+                val day = calcDayDifference(profile.creationDate, it.date)
+                if (day >= 0 && day < size)
+                    dayEntries[day].add(it)
             }
 
             entriesByDayData.postValue(dayEntries)
@@ -164,10 +162,9 @@ class ColorGrid : RecyclerView {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-    private val gridLayoutManager: GridLayoutManager
+    private val gridLayoutManager: GridLayoutManager = GridLayoutManager(context, 7)
 
     init {
-        gridLayoutManager = GridLayoutManager(context, 7)
         layoutManager = gridLayoutManager
         setHasFixedSize(true)  // Optimization
     }
@@ -221,7 +218,7 @@ class ColorGridFragment : Fragment() {
         mainModel.getInsertedEntry().observe(viewLifecycleOwner) { entry ->
             if (entry.profile!!.id == profileId && entry.id != -1L) {
                 val profile = gridModel.getProfile().value!!
-                val position = calcDayDifference(profile.creationDate, entry.date!!)
+                val position = calcDayDifference(profile.creationDate, entry.date)
                 val entriesByDayData = adapter.dayEntries
                 ensureEntriesSize()
                 if (entriesByDayData.isNotEmpty() && position < entriesByDayData.size) {
@@ -266,7 +263,7 @@ class ColorGridFragment : Fragment() {
         ensureEntriesSize()
     }
 
-    fun ensureEntriesSize() {
+    private fun ensureEntriesSize() {
         val profile = gridModel.getProfile().value
         if (profile != null) {
             val oldSize = adapter.dayEntries.size
