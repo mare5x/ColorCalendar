@@ -65,6 +65,10 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
     fun removeProfile(profile: ProfileEntry) {
         profilesData.value?.remove(profile)
     }
+
+    fun containsProfile(profile: ProfileEntry): Boolean {
+        return getProfile(profile.id) != null
+    }
 }
 
 class ProfilesViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {

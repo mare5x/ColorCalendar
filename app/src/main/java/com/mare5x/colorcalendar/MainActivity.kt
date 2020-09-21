@@ -133,36 +133,44 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
             }
         })
 
+        // NOTE: live data observe functions get called also after configuration changes.
+        // Make sure not to repeat operations!
         mainViewModel.getInsertedProfile().observe(this) { profile ->
-            profilesViewModel.addProfile(profile)
-            val position = profilesViewModel.getPosition(profile)
-            profileFragmentAdapter.notifyItemInserted(position)
-            profileSpinnerAdapter.notifyDataSetChanged()
+            if (!profilesViewModel.containsProfile(profile)) {
+                profilesViewModel.addProfile(profile)
+                val position = profilesViewModel.getPosition(profile)
+                profileFragmentAdapter.notifyItemInserted(position)
+                profileSpinnerAdapter.notifyDataSetChanged()
 
-            changeProfile(profile)
+                changeProfile(profile)
+            }
         }
 
         mainViewModel.getUpdatedProfile().observe(this) { profile ->
             val position = profilesViewModel.getPosition(profile)
-            profilesViewModel.setProfile(profile, position)
-            profileFragmentAdapter.notifyItemChanged(position)
-            profileSpinnerAdapter.notifyDataSetChanged()
+            if (position != -1 && profilesViewModel.getProfile(position) != profile) {
+                profilesViewModel.setProfile(profile, position)
+                profileFragmentAdapter.notifyItemChanged(position)
+                profileSpinnerAdapter.notifyDataSetChanged()
 
-            changeProfile(profile)
+                changeProfile(profile)
+            }
         }
 
         mainViewModel.getDeletedProfile().observe(this) { profile ->
             val index = profilesViewModel.getPosition(profile)
-            profilesViewModel.removeProfile(profile)
-            profileFragmentAdapter.notifyItemRemoved(index)
-            profileSpinnerAdapter.notifyDataSetChanged()
+            if (index != -1) {
+                profilesViewModel.removeProfile(profile)
+                profileFragmentAdapter.notifyItemRemoved(index)
+                profileSpinnerAdapter.notifyDataSetChanged()
 
-            if (profilesViewModel.getSize() > 0) {
-                val newProfile = profilesViewModel.getProfile(max(0, index - 1))
-                changeProfile(newProfile)
-            } else {
-                // Last profile has just been deleted. Prompt for a new profile.
-                forcePromptNewProfile()
+                if (profilesViewModel.getSize() > 0) {
+                    val newProfile = profilesViewModel.getProfile(max(0, index - 1))
+                    changeProfile(newProfile)
+                } else {
+                    // Last profile has just been deleted. Prompt for a new profile.
+                    forcePromptNewProfile()
+                }
             }
         }
 
@@ -277,9 +285,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
     }
 
     override fun onProfileDelete() {
-        mainViewModel.run {
-            deleteProfile(currentProfile!!)
-        }
+        mainViewModel.deleteProfile(currentProfile!!)
     }
 
     override fun onEntryCancel() {}
