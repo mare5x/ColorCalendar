@@ -104,20 +104,35 @@ class DatePickerFragment : DialogFragment() {
     private lateinit var listener: DatePickerDialog.OnDateSetListener
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        // Use the current time as the default values for the picker
-        val c = Calendar.getInstance()
-        val year = c.get(Calendar.YEAR)
-        val month = c.get(Calendar.MONTH)
-        val day = c.get(Calendar.DAY_OF_MONTH)
+        val args = requireArguments()
+        val year = args.getInt(YEAR_KEY)
+        val month = args.getInt(MONTH_KEY)
+        val day = args.getInt(DAY_KEY)
         return DatePickerDialog(requireContext(), listener, year, month, day).also { dialog ->
             // Don't allow profiles in the future.
-            dialog.datePicker.maxDate = c.timeInMillis
+            dialog.datePicker.maxDate = Calendar.getInstance().timeInMillis
         }
     }
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
         listener = context as DatePickerDialog.OnDateSetListener
+    }
+
+    companion object {
+        const val YEAR_KEY = "YEAR_KEY"
+        const val MONTH_KEY = "MONTH_KEY"
+        const val DAY_KEY = "DAY_KEY"
+
+        fun create(year: Int, month: Int, dayOfMonth: Int): DatePickerFragment {
+            val fragment = DatePickerFragment()
+            fragment.arguments = Bundle().apply {
+                putInt(YEAR_KEY, year)
+                putInt(MONTH_KEY, month)
+                putInt(DAY_KEY, dayOfMonth)
+            }
+            return fragment
+        }
     }
 }
 
@@ -130,6 +145,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     private var profileId: Long = -1L  // Used when editing profile.
     private var profileCreationDate: Long = -1L
     private var forceSelection = false
+
+    private var year: Int = 0
+    private var month: Int = 0
+    private var dayOfMonth: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -158,7 +177,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         }
         dateButton = findViewById(R.id.dateButton)
         dateButton.setOnClickListener {
-            DatePickerFragment().show(supportFragmentManager, "datePicker")
+            DatePickerFragment.create(year, month, dayOfMonth).show(supportFragmentManager, "datePicker")
         }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
@@ -263,6 +282,11 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     }
 
     override fun onDateSet(view: DatePicker?, year: Int, month: Int, dayOfMonth: Int) {
+        // Store selected date, so that we can reopen the date picker dialog at the saved date.
+        this.year = year
+        this.month = month
+        this.dayOfMonth = dayOfMonth
+
         // month \in [0, 11]
         profileCreationDate = Calendar.getInstance().apply {
             set(Calendar.YEAR, year)
