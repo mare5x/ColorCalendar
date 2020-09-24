@@ -2,11 +2,15 @@ package com.mare5x.colorcalendar
 
 import android.content.Context
 import android.graphics.Color
+import android.os.Bundle
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.math.MathUtils.clamp
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.*
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -16,12 +20,6 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 import kotlin.math.roundToInt
-import android.os.Bundle
-import android.widget.Toast
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.activityViewModels
-import androidx.fragment.app.viewModels
-import androidx.lifecycle.observe
 
 
 fun calcDayDifference(d1: Date, d2: Date): Int {
@@ -30,14 +28,14 @@ fun calcDayDifference(d1: Date, d2: Date): Int {
         time = d1
         set(Calendar.SECOND, 0)
         set(Calendar.MINUTE, 0)
-        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.HOUR_OF_DAY, 6)  // Stupid workaround because of historical time zone offsets (+-1 errors)
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis
     val t2 = Calendar.getInstance().apply {
         time = d2
         set(Calendar.SECOND, 0)
         set(Calendar.MINUTE, 0)
-        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.HOUR_OF_DAY, 12)
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis
     return TimeUnit.DAYS.convert(t2 - t1, TimeUnit.MILLISECONDS).toInt()
@@ -116,16 +114,27 @@ class ColorGridViewModelFactory(private val db: DatabaseHelper) : ViewModelProvi
 class ColorRectAdapter(var profile: ProfileEntry) :
         RecyclerView.Adapter<ColorRectAdapter.ViewHolder>() {
 
-    class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
-        val rect: ColorRect
-
-        var clickListener: (position: Int) -> Unit = { }
+    inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+        private val rect: ColorRect
 
         init {
-            v.setOnClickListener { clickListener(adapterPosition) }
+            v.setOnClickListener {
+                clickListener(dayPosition(adapterPosition))
+            }
             rect = v.findViewById(R.id.colorRect)
         }
+
+        fun bind(position: Int) {
+            val day = dayPosition(position)
+            val entry = if (dayEntries[day].size > 0) dayEntries[day].last() else null
+            rect.color =
+                if (entry != null) calcGradientColor(profile.minColor, profile.maxColor, entry.value)
+                else Color.GRAY
+        }
     }
+
+    // Show day entries sorted ascending or descending by date.
+    var orderDesc = true
 
     // Refers to the list in the view model.
     var dayEntries: EntryList = mutableListOf()
@@ -136,21 +145,36 @@ class ColorRectAdapter(var profile: ProfileEntry) :
 
     var clickListener: (position: Int) -> Unit = { }
 
+    // Adapter positions must be transformed using dayPosition to get the correct
+    // entry index. Day positions must likewise be transformed by this function to get
+    // the adapter positions.
+    private fun dayPosition(position: Int): Int {
+        return if (orderDesc) (dayEntries.size - position - 1) else position
+    }
+
+    fun notifyDayChanged(dayPosition: Int) {
+        notifyItemChanged(dayPosition(dayPosition))
+    }
+
+    fun addDayEntry(entry: Entry) {
+        val position = calcDayDifference(profile.creationDate, entry.date)
+        if (dayEntries.isNotEmpty() && position < dayEntries.size) {
+            dayEntries[position].add(entry)
+        }
+        notifyDayChanged(position)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         // TODO layout inflation is the bottleneck when first populating the grid ...
         // The problem is mitigated by displaying fewer columns
         val v = LayoutInflater.from(parent.context).inflate(R.layout.color_grid_item, parent, false)
-        return ViewHolder(v).also { h -> h.clickListener = clickListener }
+        return ViewHolder(v)
     }
 
     override fun getItemCount(): Int = dayEntries.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        // Use 'position' as the number of days since profile creation date.
-        val entry = if (dayEntries[position].size > 0) dayEntries[position].last() else null
-        holder.rect.color = if (entry != null)
-            calcGradientColor(profile.minColor, profile.maxColor, entry.value)
-            else Color.GRAY
+        holder.bind(position)
     }
 
     companion object {
@@ -217,15 +241,8 @@ class ColorGridFragment : Fragment() {
 
         mainModel.getInsertedEntry().observe(viewLifecycleOwner) { entry ->
             if (entry.profile!!.id == profileId && entry.id != -1L) {
-                val profile = gridModel.getProfile().value!!
-                val position = calcDayDifference(profile.creationDate, entry.date)
-                val entriesByDayData = adapter.dayEntries
                 ensureEntriesSize()
-                if (entriesByDayData.isNotEmpty() && position < entriesByDayData.size) {
-                    entriesByDayData[position].add(entry)
-                }
-
-                adapter.notifyItemChanged(position)
+                adapter.addDayEntry(entry)
             }
         }
 
@@ -244,13 +261,10 @@ class ColorGridFragment : Fragment() {
             adapter.profile = profile
         }
         gridModel.getDayChanged().observe(viewLifecycleOwner) { dayPosition ->
-            adapter.notifyItemChanged(dayPosition)
+            adapter.notifyDayChanged(dayPosition)
         }
 
         adapter.clickListener = { day ->
-            val dayEntries = adapter.dayEntries
-            Toast.makeText(context, "Day: $day (${dayEntries[day].size})", Toast.LENGTH_SHORT).show()
-
             val dialog = EntryViewerDialog.create(adapter.profile, day)
             dialog.show(childFragmentManager, "entryViewer")
         }
