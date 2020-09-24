@@ -231,7 +231,7 @@ class ColorGridFragment : Fragment() {
 
         mainModel.getUpdatedProfile().observe(viewLifecycleOwner) { profile ->
             if (profile.id == profileId) {
-                gridModel.setProfile(profile)
+                gridModel.initProfile(profileId)
                 adapter.profile = profile
                 adapter.notifyDataSetChanged()
             }

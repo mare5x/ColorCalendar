@@ -40,7 +40,6 @@ class MainViewModel(val db: DatabaseHelper) : ViewModel() {
     fun getInsertedProfile() = insertedProfile
     fun insertProfile(profile: ProfileEntry) {
         viewModelScope.launch(Dispatchers.IO) {
-            profile.creationDate = Date()
             profile.id = db.insertProfile(profile)
             insertedProfile.postValue(profile)
         }
@@ -251,7 +250,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                     profile.maxColor = bundle.getInt(ProfileEditorActivity.PROFILE_MAX_COLOR_KEY)
                     profile.prefColor = bundle.getInt(ProfileEditorActivity.PROFILE_PREF_COLOR_KEY)
                     profile.creationDate = bundle.getLong(ProfileEditorActivity.PROFILE_CREATION_DATE_KEY, -1L).let { date ->
-                        if (date < 0) Date()
+                        if (date == -1L) Date()
                         else Date(date)
                     }
                     if (profile.id == -1L) {

@@ -1,6 +1,7 @@
 package com.mare5x.colorcalendar
 
 import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
@@ -10,10 +11,11 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.EditText
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
+import java.text.DateFormat
+import java.util.*
 
 
 class ProfileDeleteDialog : DialogFragment() {
@@ -98,10 +100,33 @@ class ProfileDiscardDialog : DialogFragment() {
 }
 
 
-class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener {
+class DatePickerFragment : DialogFragment() {
+    private lateinit var listener: DatePickerDialog.OnDateSetListener
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        // Use the current time as the default values for the picker
+        val c = Calendar.getInstance()
+        val year = c.get(Calendar.YEAR)
+        val month = c.get(Calendar.MONTH)
+        val day = c.get(Calendar.DAY_OF_MONTH)
+        return DatePickerDialog(requireContext(), listener, year, month, day).also { dialog ->
+            // Don't allow profiles in the future.
+            dialog.datePicker.maxDate = c.timeInMillis
+        }
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as DatePickerDialog.OnDateSetListener
+    }
+}
+
+
+class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener {
     private lateinit var circleBar: ColorCircleBar
     private lateinit var profileText: EditText
     private lateinit var colorBar: ColorSeekBar2
+    private lateinit var dateButton: Button
     private var profileId: Long = -1L  // Used when editing profile.
     private var profileCreationDate: Long = -1L
     private var forceSelection = false
@@ -131,10 +156,21 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         colorBar.onValueChanged = { _, prefColor ->
             setUIColor(prefColor)
         }
+        dateButton = findViewById(R.id.dateButton)
+        dateButton.setOnClickListener {
+            DatePickerFragment().show(supportFragmentManager, "datePicker")
+        }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
-        // For now just relay the creation date ... (when editing)
-        profileCreationDate = intent.getLongExtra(PROFILE_CREATION_DATE_KEY, -1L)
+
+        // NOTE: since time is measured since 1970, dates before that are negative!
+        intent.getLongExtra(PROFILE_CREATION_DATE_KEY, -1L).let { date ->
+            profileCreationDate = date
+            val d =
+                if (date == -1L) Calendar.getInstance()
+                else Calendar.getInstance().apply { timeInMillis = date }
+            onDateSet(null, d.get(Calendar.YEAR), d.get(Calendar.MONTH), d.get(Calendar.DAY_OF_MONTH))
+        }
 
         intent.getStringExtra(PROFILE_NAME_KEY).let { name ->
             if (name != null) {
@@ -224,6 +260,16 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             hsv[2] *= 0.8f
             window.statusBarColor = Color.HSVToColor(hsv)
         }
+    }
+
+    override fun onDateSet(view: DatePicker?, year: Int, month: Int, dayOfMonth: Int) {
+        // month \in [0, 11]
+        profileCreationDate = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month)
+            set(Calendar.DAY_OF_MONTH, dayOfMonth)
+        }.timeInMillis
+        dateButton.text = DateFormat.getDateInstance().format(Date(profileCreationDate))
     }
 
     companion object {
