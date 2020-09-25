@@ -29,6 +29,20 @@ fun circleDistance(alpha: Float, beta: Float) : Float {
     return if (d > 180f) (360 - d) else d
 }
 
+fun complementaryColor(color: Int) : Int {
+    val hsv = FloatArray(3)
+    Color.colorToHSV(color, hsv)
+    hsv[0] = (hsv[0] + 180f) % 360f
+    return Color.HSVToColor(hsv)
+}
+
+fun dimColor(color: Int, dim: Float) : Int {
+    val hsv = FloatArray(3)
+    Color.colorToHSV(color, hsv)
+    hsv[2] *= dim
+    return Color.HSVToColor(hsv)
+}
+
 fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
     val hsv1 = floatArrayOf(0f, 0f, 0f)
     Color.RGBToHSV(startColor.red, startColor.green, startColor.blue, hsv1)
@@ -88,6 +102,7 @@ class ColorSeekBar2 : ColorSeekBar {
     override fun updateGradientBackground() {
         val bg = ColorGradientDrawable(startColor, endColor, fullHue)
 
+        // TODO this
         // progressDrawable = grad
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             background = bg
@@ -184,7 +199,7 @@ class ColorPickerBar : ConstraintLayout {
     }
 
     private fun updateColorRect() {
-        colorRect.color = colorBar.getColor()
+        colorRect.setColor(colorBar.getColor())
     }
 
     fun getNormProgress(): Float = colorBar.getNormProgress()
@@ -547,7 +562,7 @@ class ColorCircleBar : View {
     }
 
     override fun onRestoreInstanceState(state: Parcelable?) {
-        if (!(state is SavedState)) {
+        if (state !is SavedState) {
             super.onRestoreInstanceState(state)
             return
         }

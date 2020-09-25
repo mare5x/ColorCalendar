@@ -3,38 +3,53 @@ package com.mare5x.colorcalendar
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.drawable.ShapeDrawable
-import android.graphics.drawable.shapes.RectShape
+import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
 import kotlin.math.max
 import kotlin.math.min
 
 
-// TODO simplify ...
 class ColorRect : View {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-    private var rectDrawable = ShapeDrawable(RectShape()).apply {
-        paint.color = color
+    var drawBorder = false
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
+
+    val borderPaint = Paint().apply {
+        isAntiAlias = false
+        style = Paint.Style.STROKE
+        color = Color.RED
+        strokeWidth = 4f * resources.displayMetrics.density  // Used as radius, not as width!
     }
 
-    var color : Int = 0
-        set(value) {
-            field = value
-            rectDrawable.paint.color = value
-            invalidate()
-        }
+    fun setColor(color: Int) {
+        setBackgroundColor(color)
+        invalidate()
+    }
+
+    fun setBorderColor(color: Int) {
+        borderPaint.color = color
+        invalidate()
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = max(MeasureSpec.getSize(widthMeasureSpec), suggestedMinimumWidth)
         setMeasuredDimension(w, w)
     }
 
-    override fun onDraw(canvas: Canvas) {
-        rectDrawable.setBounds(0, 0, width, height)
-        rectDrawable.draw(canvas)
+    override fun onDraw(canvas: Canvas?) {
+        super.onDraw(canvas)
+
+        if (drawBorder) {
+            canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), borderPaint)
+        }
     }
 }
 

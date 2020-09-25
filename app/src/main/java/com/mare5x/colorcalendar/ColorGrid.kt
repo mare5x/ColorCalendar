@@ -127,9 +127,18 @@ class ColorRectAdapter(var profile: ProfileEntry) :
         fun bind(position: Int) {
             val day = dayPosition(position)
             val entry = if (dayEntries[day].size > 0) dayEntries[day].last() else null
-            rect.color =
+            rect.setColor(
                 if (entry != null) calcGradientColor(profile.minColor, profile.maxColor, entry.value)
                 else Color.GRAY
+            )
+            rect.drawBorder = (day == dayEntries.size - 1)
+            if (rect.drawBorder) {
+                val hsv = FloatArray(3)
+                Color.colorToHSV(profile.prefColor, hsv)
+                hsv[1] *= 0.5f
+                hsv[2] *= 0.75f
+                rect.setBorderColor(Color.HSVToColor(hsv))
+            }
         }
     }
 

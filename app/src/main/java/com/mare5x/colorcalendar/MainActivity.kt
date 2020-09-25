@@ -266,10 +266,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
     private fun setUIColor(color: Int) {
         supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val hsv = floatArrayOf(0f, 0f, 0f)
-            Color.colorToHSV(color, hsv)
-            hsv[2] *= 0.8f
-            window.statusBarColor = Color.HSVToColor(hsv)
+            window.statusBarColor = dimColor(color, 0.8f)
         }
     }
 

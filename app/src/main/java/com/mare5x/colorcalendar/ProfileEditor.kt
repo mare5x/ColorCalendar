@@ -5,13 +5,15 @@ import android.app.DatePickerDialog
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.*
+import android.widget.Button
+import android.widget.DatePicker
+import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
 import java.text.DateFormat
@@ -274,10 +276,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     private fun setUIColor(color: Int) {
         supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val hsv = floatArrayOf(0f, 0f, 0f)
-            Color.colorToHSV(color, hsv)
-            hsv[2] *= 0.8f
-            window.statusBarColor = Color.HSVToColor(hsv)
+            window.statusBarColor = dimColor(color, 0.8f)
         }
     }
 

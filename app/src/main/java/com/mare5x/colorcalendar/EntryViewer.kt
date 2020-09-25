@@ -60,7 +60,7 @@ class EntryAdapter(
         when (holder) {
             is EntryViewHolder -> {
                 val entry = entries[position]
-                holder.colorItem.color = calcGradientColor(profile.minColor, profile.maxColor, entry.value)
+                holder.colorItem.setColor(calcGradientColor(profile.minColor, profile.maxColor, entry.value))
                 holder.entryText.text = entryDateFormat.format(entry.date)
             }
             is AdderViewHolder -> {
