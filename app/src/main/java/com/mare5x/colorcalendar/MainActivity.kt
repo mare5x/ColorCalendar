@@ -1,23 +1,27 @@
 package com.mare5x.colorcalendar
 
+import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.util.AttributeSet
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.widget.AdapterView
 import android.widget.Spinner
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.math.MathUtils.clamp
 import androidx.lifecycle.*
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.*
+import kotlin.math.abs
 import kotlin.math.max
 
 // NOTE: for constraint layout see the developer guide at:
@@ -303,5 +307,58 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
     companion object {
         private const val TAG = "MainActivity"
         private const val PROFILE_EDITOR_CODE = 42
+    }
+}
+
+
+// https://stackoverflow.com/questions/46370836/android-movable-draggable-floating-action-button-fab
+// Use a movable floating action button for the add entry button because the button can overlap
+// the grid with no way to access the grid items.
+class MovableFloatingActionButton @JvmOverloads constructor(
+    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
+) : FloatingActionButton(context, attrs, defStyleAttr), View.OnTouchListener {
+
+    init {
+        setOnTouchListener(this)
+    }
+
+    private var downX = 0f
+    private var downY = 0f
+    private var dx = 0f
+    private var dy = 0f
+
+    override fun onTouch(view: View, event: MotionEvent): Boolean {
+        return when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.rawX
+                downY = event.rawY
+                dx = view.x - downX
+                dy = view.y - downY
+                true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val parent: View = view.parent as View
+                var newX = event.rawX + dx
+                var newY = event.rawY + dy
+                newX = clamp(newX, 0f, (parent.width - view.width).toFloat())
+                newY = clamp(newY, parent.height * 0.5f, (parent.height - view.height).toFloat())
+                view.animate().x(newX).y(newY).setDuration(0).start()
+                true
+            }
+            MotionEvent.ACTION_UP -> {
+                if (abs(event.rawX - downX) < CLICK_DRAG_TOLERANCE && abs(event.rawY - downY) < CLICK_DRAG_TOLERANCE) {
+                    performClick()
+                } else {
+                    true
+                }
+            }
+            else -> {
+                super.onTouchEvent(event)
+            }
+        }
+    }
+
+    companion object {
+        const val CLICK_DRAG_TOLERANCE = 10f
     }
 }
