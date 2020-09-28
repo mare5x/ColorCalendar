@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
 import android.util.AttributeSet
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -143,7 +144,7 @@ class ColorRectAdapter(var profile: ProfileEntry) :
     }
 
     // Show day entries sorted ascending or descending by date.
-    var orderDesc = true
+    private var orderDesc = true
 
     // Refers to the list in the view model.
     var dayEntries: EntryList = mutableListOf()
@@ -248,6 +249,31 @@ class ColorGridFragment : Fragment() {
         grid = view.findViewById(R.id.colorGrid)
         grid.adapter = adapter
 
+        // Note: it was simpler to put the fab in the root activity instead of here because
+        // the view pager was intercepting certain touch events ...
+        grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                if (grid.computeVerticalScrollOffset() > grid.computeVerticalScrollExtent()) {
+                    mainModel.setShowScrollFab(true)
+                } else {
+                    mainModel.setShowScrollFab(false)
+                }
+            }
+        })
+
+        mainModel.getScrollFabClickedEvent().observe(viewLifecycleOwner) { clickEvent ->
+            // The event gets sent to all observers (also pages other than the current one in the
+            // view pager). For that reason we must peek the event's profile id before marking it handled.
+            Log.i(TAG, "onViewCreated: ${clickEvent.peekContent()} | $profileId ${clickEvent.hasBeenHandled}")
+            clickEvent.peekContent().let { id ->
+                if (profileId == id && !clickEvent.hasBeenHandled) {
+                    clickEvent.hasBeenHandled = true
+                    scrollToTop()
+                }
+            }
+        }
+
         mainModel.getInsertedEntry().observe(viewLifecycleOwner) { entry ->
             if (entry.profile!!.id == profileId && entry.id != -1L) {
                 ensureEntriesSize()
@@ -296,6 +322,12 @@ class ColorGridFragment : Fragment() {
                 adapter.notifyItemRangeInserted(oldSize, newSize - oldSize)
             }
         }
+    }
+
+    private fun scrollToTop() {
+        // Smooth scrolling takes too long if the list is long ...
+        // grid.smoothScrollToPosition(0)
+        grid.scrollToPosition(0)
     }
 
     companion object {

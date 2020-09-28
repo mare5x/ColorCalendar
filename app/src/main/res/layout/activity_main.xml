@@ -21,12 +21,21 @@
     </com.google.android.material.appbar.AppBarLayout>
 
     <com.mare5x.colorcalendar.MovableFloatingActionButton
-        android:id="@+id/fab"
+        android:id="@+id/entry_fab"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="@dimen/fab_margin"
         app:srcCompat="@drawable/ic_add_white_24dp" />
+
+    <com.mare5x.colorcalendar.MovableFloatingActionButton
+        android:id="@+id/scroll_fab"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="@dimen/fab_margin"
+        app:srcCompat="@drawable/ic_expand_less_white_24dp"
+        android:visibility="invisible" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/pager"

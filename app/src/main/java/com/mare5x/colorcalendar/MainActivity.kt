@@ -29,12 +29,44 @@ import kotlin.math.max
 // NOTE: fragment's parent must implement interface ... Using function callbacks doesn't work because of configuration changes ...!
 // NOTE: Dialog's use wrap_content for layout width and height ...
 
+
+/** https://medium.com/androiddevelopers/livedata-with-snackbar-navigation-and-other-events-the-singleliveevent-case-ac2622673150
+ * Used as a wrapper for data that is exposed via a LiveData that represents an event.
+ * */
+open class Event<out T>(private val content: T) {
+
+    var hasBeenHandled = false
+
+    /**
+     * Returns the content and prevents its use again.
+     */
+    fun getContentIfNotHandled(): T? {
+        return if (hasBeenHandled) {
+            null
+        } else {
+            hasBeenHandled = true
+            content
+        }
+    }
+
+    /**
+     * Returns the content, even if it's already been handled.
+     */
+    fun peekContent(): T = content
+}
+
+
 class MainViewModel(val db: DatabaseHelper) : ViewModel() {
     private val currentProfile = MutableLiveData<ProfileEntry>()
     private val insertedProfile = MutableLiveData<ProfileEntry>()
     private val updatedProfile = MutableLiveData<ProfileEntry>()
     private val deletedProfile = MutableLiveData<ProfileEntry>()
     private val insertedEntry = MutableLiveData<Entry>()
+
+    // Single shot event to handle communication between ColorGridFragment and
+    // the main activity.
+    private val showScrollFabEvent = MutableLiveData<Event<Boolean>>()
+    private val scrollFabClickedEvent = MutableLiveData<Event<Long>>()
 
     fun getCurrentProfile() = currentProfile
     fun setCurrentProfile(profile: ProfileEntry) {
@@ -70,6 +102,15 @@ class MainViewModel(val db: DatabaseHelper) : ViewModel() {
             insertedEntry.postValue(entry)
         }
     }
+
+    fun getShowScrollFabEvent() = showScrollFabEvent
+    fun setShowScrollFab(show: Boolean) {
+        showScrollFabEvent.value = Event(show)
+    }
+    fun getScrollFabClickedEvent() = scrollFabClickedEvent
+    fun scrollFabClicked() {
+        scrollFabClickedEvent.value = Event(currentProfile.value?.id ?: -1L)
+    }
 }
 
 class MainViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {
@@ -97,11 +138,6 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         setSupportActionBar(findViewById(R.id.toolbar))
 
         db = DatabaseHelper(this)
-
-        findViewById<FloatingActionButton>(R.id.fab).setOnClickListener {
-            val dialog = EntryEditorDialog.create(currentProfile!!)
-            dialog.show(supportFragmentManager, "entryEditor")
-        }
 
         // Set up a spinner instead of the title in the app bar.
         // The spinner is used to select the currently displayed profile.
@@ -131,8 +167,11 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         viewPager.adapter = profileFragmentAdapter
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
-                if (position < profilesViewModel.getSize())
+                if (position < profilesViewModel.getSize()) {
                     changeProfile(profilesViewModel.getProfile(position))
+                }
+
+                mainViewModel.setShowScrollFab(false)
             }
         })
 
@@ -174,6 +213,21 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                     // Last profile has just been deleted. Prompt for a new profile.
                     forcePromptNewProfile()
                 }
+            }
+        }
+
+        findViewById<FloatingActionButton>(R.id.entry_fab).setOnClickListener {
+            val dialog = EntryEditorDialog.create(currentProfile!!)
+            dialog.show(supportFragmentManager, "entryEditor")
+        }
+        val scrollFab = findViewById<FloatingActionButton>(R.id.scroll_fab)
+        scrollFab.setOnClickListener {
+            mainViewModel.scrollFabClicked()
+        }
+        mainViewModel.getShowScrollFabEvent().observe(this) { showEvent ->
+            showEvent.getContentIfNotHandled()?.let { show ->
+                if (show) scrollFab.show()
+                else scrollFab.hide()
             }
         }
 
@@ -320,12 +374,21 @@ class MovableFloatingActionButton @JvmOverloads constructor(
 
     init {
         setOnTouchListener(this)
+        isClickable = true
     }
 
     private var downX = 0f
     private var downY = 0f
     private var dx = 0f
     private var dy = 0f
+
+    // Work around, so that animations still work when dragging and to get rid of double clicking.
+    private var clickListener: OnClickListener? = null
+
+    override fun setOnClickListener(listener: OnClickListener?) {
+        // super.setOnClickListener(listener)
+        clickListener = listener
+    }
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
         return when (event.actionMasked) {
@@ -334,7 +397,7 @@ class MovableFloatingActionButton @JvmOverloads constructor(
                 downY = event.rawY
                 dx = view.x - downX
                 dy = view.y - downY
-                true
+                super.onTouchEvent(event)
             }
             MotionEvent.ACTION_MOVE -> {
                 val parent: View = view.parent as View
@@ -346,8 +409,16 @@ class MovableFloatingActionButton @JvmOverloads constructor(
                 true
             }
             MotionEvent.ACTION_UP -> {
+                // Use super. touch events to get the ripple effect.
+                // val clickListenerCopy = clickListener
+                // setOnClickListener(null)
+                super.onTouchEvent(event)
+                // setOnClickListener(clickListenerCopy)
+
                 if (abs(event.rawX - downX) < CLICK_DRAG_TOLERANCE && abs(event.rawY - downY) < CLICK_DRAG_TOLERANCE) {
-                    performClick()
+                    // performClick() would double click with default setOnClickListener
+                    clickListener?.onClick(this)
+                    true
                 } else {
                     true
                 }
