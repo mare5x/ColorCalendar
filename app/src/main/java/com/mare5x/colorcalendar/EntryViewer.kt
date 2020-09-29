@@ -242,7 +242,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
     private var hourOfDay: Int = 0
     private var minute: Int = 0
 
-    private lateinit var timeText: TextView
+    private lateinit var timeButton: Button
 
     init {
         val c = Calendar.getInstance()
@@ -268,7 +268,10 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorPickerBar)
         colorPickerBar.setColors(minColor, maxColor)
 
-        timeText = view.findViewById(R.id.timeText)
+        savedInstanceState?.let { state ->
+            hourOfDay = state.getInt(HOUR_KEY, hourOfDay)
+            minute = state.getInt(MINUTE_KEY, minute)
+        }
 
         val cancelButton = view.findViewById<Button>(R.id.cancelButton)
         cancelButton.setOnClickListener {
@@ -282,8 +285,8 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
             if (showsDialog)
                 dismiss()
         }
-        val timePickerButton = view.findViewById<Button>(R.id.timePickerButton)
-        timePickerButton.setOnClickListener {
+        timeButton = view.findViewById(R.id.timePickerButton)
+        timeButton.setOnClickListener {
             TimePickerFragment().show(childFragmentManager, "timePicker")
         }
 
@@ -303,11 +306,21 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
     override fun onTimeSet(view: TimePicker?, hourOfDay: Int, minute: Int) {
         this.hourOfDay = hourOfDay
         this.minute = minute
-        timeText.text = resources.getString(R.string.entry_time, hourOfDay, minute)
+        timeButton.text = resources.getString(R.string.entry_time, hourOfDay, minute)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+
+        outState.putInt(HOUR_KEY, hourOfDay)
+        outState.putInt(MINUTE_KEY, minute)
     }
 
     companion object {
         const val TAG = "EntryEditorDialog"
+
+        const val HOUR_KEY = "HOUR_KEY"
+        const val MINUTE_KEY = "MINUTE_KEY"
 
         const val LOW_COLOR_KEY = "LOW_COLOR"
         const val HIGH_COLOR_KEY = "HIGH_COLOR_KEY"

@@ -319,7 +319,7 @@ class ColorGridFragment : Fragment() {
             val newSize = getProfileDayAge(profile)
             if (newSize > oldSize) {
                 gridModel.ensureEntriesSize(newSize)
-                adapter.notifyItemRangeInserted(oldSize, newSize - oldSize)
+                adapter.notifyDataSetChanged()
             }
         }
     }

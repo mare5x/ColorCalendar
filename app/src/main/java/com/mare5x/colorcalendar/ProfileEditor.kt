@@ -190,7 +190,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             val d =
                 if (date == -1L) Calendar.getInstance()
                 else Calendar.getInstance().apply { timeInMillis = date }
-            onDateSet(null, d.get(Calendar.YEAR), d.get(Calendar.MONTH), d.get(Calendar.DAY_OF_MONTH))
+            val year = savedInstanceState?.getInt(YEAR_KEY, d.get(Calendar.YEAR)) ?: d.get(Calendar.YEAR)
+            val month = savedInstanceState?.getInt(MONTH_KEY, d.get(Calendar.MONTH)) ?: d.get(Calendar.MONTH)
+            val day = savedInstanceState?.getInt(DAY_KEY, d.get(Calendar.DAY_OF_MONTH)) ?: d.get(Calendar.DAY_OF_MONTH)
+            onDateSet(null, year, month, day)
         }
 
         intent.getStringExtra(PROFILE_NAME_KEY).let { name ->
@@ -295,7 +298,22 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         dateButton.text = DateFormat.getDateInstance().format(Date(profileCreationDate))
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+
+        // So that teh set date is not lost on configuration change.
+        outState.apply {
+            putInt(YEAR_KEY, year)
+            putInt(MONTH_KEY, month)
+            putInt(DAY_KEY, dayOfMonth)
+        }
+    }
+
     companion object {
+        const val YEAR_KEY = "YEAR_KEY"
+        const val MONTH_KEY = "MONTH_KEY"
+        const val DAY_KEY = "DAY_KEY"
+
         const val FORCE_SELECTION_KEY = "force_selection_key"
         const val PROFILE_ID_KEY = "profile_id_key"
         const val PROFILE_NAME_KEY = "profile_name_key"

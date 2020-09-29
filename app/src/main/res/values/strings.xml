@@ -15,7 +15,7 @@
     <string name="profile_name">Name</string>
 
     <string name="pick_time">Pick time</string>
-    <string name="entry_time">Time: %02d:%02d</string>
+    <string name="entry_time">%02d:%02d</string>
 
     <string name="delete_profile">Delete profile</string>
     <string name="new_profile">New profile</string>
