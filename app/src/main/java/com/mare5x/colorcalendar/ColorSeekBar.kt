@@ -22,6 +22,8 @@ import androidx.core.graphics.green
 import androidx.core.graphics.red
 import kotlin.math.*
 
+// TODO pick a shade of a single color
+
 
 // Shortest distance between angles alpha and beta.
 fun circleDistance(alpha: Float, beta: Float) : Float {

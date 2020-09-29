@@ -296,10 +296,10 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
     override fun onAttach(context: Context) {
         super.onAttach(context)
         // Dialog can be spawned either by a fragment/dialog or the main activity.
-        if (parentFragment is EntryEditorListener) {
-            listener = parentFragment as EntryEditorListener
+        listener = if (parentFragment is EntryEditorListener) {
+            parentFragment as EntryEditorListener
         } else {
-            listener = context as? EntryEditorListener
+            context as? EntryEditorListener
         }
     }
 
