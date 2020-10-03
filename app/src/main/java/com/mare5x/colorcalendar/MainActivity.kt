@@ -264,7 +264,6 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
-            R.id.action_settings -> true
             R.id.action_create_profile -> {
                 val intent = Intent(this, ProfileEditorActivity::class.java)
                 startActivityForResult(intent, PROFILE_EDITOR_CODE)
