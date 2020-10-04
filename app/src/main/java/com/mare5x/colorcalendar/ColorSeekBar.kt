@@ -106,8 +106,10 @@ class ColorSeekBar2 : ColorSeekBar {
 
         // TODO this
         // progressDrawable = grad
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+        if (Build.VERSION.SDK_INT >= 16) {
             background = bg
+        } else {
+            setBackgroundDrawable(bg)
         }
     }
 }
@@ -147,6 +149,8 @@ open class ColorSeekBar : AppCompatSeekBar {
         // progressDrawable = grad
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             background = bg
+        } else {
+            setBackgroundDrawable(bg)
         }
     }
 
@@ -183,7 +187,7 @@ class ColorPickerBar : ConstraintLayout {
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
     private var colorRect: ColorRect
-    private var colorBar: ColorSeekBar
+    private var colorBar: ColorSeekBar2
 
     var onValueChanged: (value: Float, color: Int) -> Unit = { _, _ ->  }
 

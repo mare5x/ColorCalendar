@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Button xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- https://stackoverflow.com/questions/35761636/is-it-possible-to-use-vectordrawable-in-buttons-and-textviews-using-androiddraw -->
+<ImageButton xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/addButton"
     android:layout_width="match_parent"
     android:layout_height="@dimen/color_item_size"
     android:layout_margin="16dp"
-    android:drawableRight="@drawable/ic_add_white_24dp"
-    android:drawableEnd="@drawable/ic_add_white_24dp"
-    android:text="@string/add_button"
+    app:srcCompat="@drawable/ic_add_white_24dp"
+    android:contentDescription="@string/add_button"
     />

@@ -2,7 +2,7 @@
 <merge xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <com.mare5x.colorcalendar.ColorSeekBar
+    <com.mare5x.colorcalendar.ColorSeekBar2
         android:id="@+id/colorSeekBar"
         android:layout_width="0dp"
         android:layout_height="24dp"

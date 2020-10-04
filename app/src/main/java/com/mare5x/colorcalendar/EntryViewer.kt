@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.TimePicker
 import androidx.fragment.app.DialogFragment
@@ -35,7 +36,7 @@ class EntryAdapter(
     }
 
     class AdderViewHolder(v: View) : RecyclerView.ViewHolder(v) {
-        val button: Button = v.findViewById(R.id.addButton)
+        val button: ImageButton = v.findViewById(R.id.addButton)
     }
 
     override fun getItemViewType(position: Int): Int {
