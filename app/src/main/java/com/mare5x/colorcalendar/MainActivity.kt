@@ -3,6 +3,7 @@ package com.mare5x.colorcalendar
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.ColorDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
@@ -20,6 +21,7 @@ import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.max
@@ -27,7 +29,7 @@ import kotlin.math.max
 // NOTE: for constraint layout see the developer guide at:
 // https://developer.android.com/reference/androidx/constraintlayout/widget/ConstraintLayout
 // NOTE: fragment's parent must implement interface ... Using function callbacks doesn't work because of configuration changes ...!
-// NOTE: Dialog's use wrap_content for layout width and height ...
+// NOTE: Dialogs use wrap_content for layout width and height ...
 
 
 /** https://medium.com/androiddevelopers/livedata-with-snackbar-navigation-and-other-events-the-singleliveevent-case-ac2622673150
@@ -290,6 +292,15 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                 startActivityForResult(intent, PROFILE_EDITOR_CODE)
                 true
             }
+            R.id.action_export -> {
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/vnd.sqlite3"
+                    putExtra(Intent.EXTRA_TITLE, "colorcalendar-backup.db")
+                }
+                startActivityForResult(intent, EXPORT_CODE)
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -317,6 +328,11 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                     }
                 }
             }
+        } else if (requestCode == EXPORT_CODE) {
+            if (resultCode == RESULT_OK) {
+                val uri = data?.data
+                exportDatabase(uri)
+            }
         }
     }
 
@@ -324,6 +340,18 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.statusBarColor = dimColor(color, 0.8f)
+        }
+    }
+    
+    private fun exportDatabase(dstUri: Uri?) {
+        if (dstUri != null) {
+            val src = File(db.readableDatabase.path)
+            val out = contentResolver.openOutputStream(dstUri)
+            if (out != null) {
+                src.inputStream().copyTo(out)
+                out.flush()
+                out.close()
+            }
         }
     }
 
@@ -360,6 +388,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
     companion object {
         private const val TAG = "MainActivity"
         private const val PROFILE_EDITOR_CODE = 42
+        private const val EXPORT_CODE = 69
     }
 }
 

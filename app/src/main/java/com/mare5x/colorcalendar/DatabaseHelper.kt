@@ -12,7 +12,7 @@ import java.util.*
 
 
 // https://developer.android.com/training/data-storage/sqlite#DefineContract
-private object DatabaseContract {
+object DatabaseContract {
     const val DB_NAME = "database.db"
     const val DB_VERSION = 1
 

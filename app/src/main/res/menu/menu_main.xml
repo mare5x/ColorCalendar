@@ -14,4 +14,8 @@
         android:orderInCategory="103"
         android:title="@string/menu_edit_profile" />
 
+    <item android:id="@+id/action_export"
+        android:orderInCategory="104"
+        android:title="@string/menu_export" />
+
 </menu>
