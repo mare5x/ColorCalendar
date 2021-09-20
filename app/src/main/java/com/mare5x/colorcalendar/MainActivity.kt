@@ -13,9 +13,11 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.AdapterView
 import android.widget.Spinner
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.math.MathUtils.clamp
+import androidx.core.view.MenuCompat
 import androidx.lifecycle.*
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -124,7 +126,10 @@ class MainViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.F
 }
 
 
-class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener, ProfileDeleteDialog.ProfileDeleteListener {
+class MainActivity : AppCompatActivity(),
+    EntryEditorDialog.EntryEditorListener,
+    ProfileDeleteDialog.ProfileDeleteListener,
+    ImportDialog.ImportDialogListener {
 
     private lateinit var db: DatabaseHelper
     private lateinit var viewPager: ViewPager2
@@ -258,6 +263,7 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.menu_main, menu)
+        MenuCompat.setGroupDividerEnabled(menu, true)
         return true
     }
 
@@ -301,6 +307,14 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                 startActivityForResult(intent, EXPORT_CODE)
                 true
             }
+            R.id.action_import -> {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/vnd.sqlite3"
+                }
+                startActivityForResult(intent, IMPORT_CODE)
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -333,6 +347,11 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
                 val uri = data?.data
                 exportDatabase(uri)
             }
+        } else if (requestCode == IMPORT_CODE) {
+            if (resultCode == RESULT_OK) {
+                val uri = data?.data
+                startImportDatabase(uri)
+            }
         }
     }
 
@@ -343,16 +362,37 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         }
     }
     
-    private fun exportDatabase(dstUri: Uri?) {
-        if (dstUri != null) {
-            val src = File(db.readableDatabase.path)
-            val out = contentResolver.openOutputStream(dstUri)
-            if (out != null) {
-                src.inputStream().copyTo(out)
-                out.flush()
-                out.close()
-            }
+    private fun exportDatabase(uri: Uri?) {
+        if (uri == null) {
+            Toast.makeText(applicationContext, "Failed to export!", Toast.LENGTH_SHORT).show()
+            return
         }
+
+        val src = File(db.readableDatabase.path)
+        val out = contentResolver.openOutputStream(uri)
+        if (out != null) {
+            src.inputStream().copyTo(out)
+            out.flush()
+            out.close()
+
+            Toast.makeText(applicationContext, "Exported successfully!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun startImportDatabase(uri: Uri?) {
+        uri ?: return
+
+        // Copy file to internal storage
+        applicationContext.openFileOutput("import.db", Context.MODE_PRIVATE).use { dst ->
+            val src = contentResolver.openInputStream(uri)
+            src?.copyTo(dst)
+            dst.flush()
+            dst.close()
+        }
+        val importPath = applicationContext.getFileStreamPath("import.db").absolutePath
+
+        val dialog = ImportDialog.create(importPath)
+        dialog.show(supportFragmentManager, "importDialog")
     }
 
     fun changeProfile(profile: ProfileEntry) {
@@ -385,10 +425,21 @@ class MainActivity : AppCompatActivity(), EntryEditorDialog.EntryEditorListener,
         mainViewModel.insertEntry(entry)
     }
 
+    override fun onImport() {
+        // Restart app to update state ...
+        finish()
+        startActivity(getIntent())
+
+        // profilesViewModel.fetchProfiles()
+        // viewModelStore.clear()
+        // recreate()
+    }
+
     companion object {
         private const val TAG = "MainActivity"
         private const val PROFILE_EDITOR_CODE = 42
         private const val EXPORT_CODE = 69
+        private const val IMPORT_CODE = 70
     }
 }
 

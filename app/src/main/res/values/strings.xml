@@ -20,4 +20,7 @@
     <string name="add_profile">Add profile</string>
     <string name="menu_edit_profile">Edit profile</string>
     <string name="menu_export">Export</string>
+    <string name="menu_import">Import</string>
+    <string name="import_dialog_title">Confirm import</string>
+    <string name="import_name_conflict">Name conflict!</string>
 </resources>

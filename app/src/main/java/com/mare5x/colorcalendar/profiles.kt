@@ -29,7 +29,7 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
 
     fun getProfiles() = profilesData
 
-    private fun fetchProfiles() {
+    fun fetchProfiles() {
         viewModelScope.launch(Dispatchers.IO) {
             val profiles = db.queryAllProfiles()
             profilesData.postValue(profiles.toMutableList())
