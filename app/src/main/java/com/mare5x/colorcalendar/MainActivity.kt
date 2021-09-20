@@ -301,16 +301,16 @@ class MainActivity : AppCompatActivity(),
             R.id.action_export -> {
                 val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "application/vnd.sqlite3"
+                    type = "*/*"
                     putExtra(Intent.EXTRA_TITLE, "colorcalendar-backup.db")
                 }
                 startActivityForResult(intent, EXPORT_CODE)
                 true
             }
             R.id.action_import -> {
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "application/vnd.sqlite3"
+                    type = "*/*"
                 }
                 startActivityForResult(intent, IMPORT_CODE)
                 true
