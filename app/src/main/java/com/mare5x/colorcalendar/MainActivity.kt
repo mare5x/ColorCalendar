@@ -368,7 +368,8 @@ class MainActivity : AppCompatActivity(),
             return
         }
 
-        val src = File(db.readableDatabase.path)
+        db.close()  // Commit changes
+        val src = File(db.writableDatabase.path)
         val out = contentResolver.openOutputStream(uri)
         if (out != null) {
             src.inputStream().copyTo(out)
@@ -391,8 +392,12 @@ class MainActivity : AppCompatActivity(),
         }
         val importPath = applicationContext.getFileStreamPath("import.db").absolutePath
 
-        val dialog = ImportDialog.create(importPath)
-        dialog.show(supportFragmentManager, "importDialog")
+        if (isValidDatabaseFile(importPath)) {
+            val dialog = ImportDialog.create(importPath)
+            dialog.show(supportFragmentManager, "importDialog")
+        } else {
+            Toast.makeText(applicationContext, "Import error!", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun changeProfile(profile: ProfileEntry) {

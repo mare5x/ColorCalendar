@@ -9,7 +9,7 @@ android {
         applicationId "com.mare5x.colorcalendar"
         minSdkVersion 19
         targetSdkVersion 30
-        versionCode 5
+        versionCode 6
         versionName "1.0"
 
         vectorDrawables.useSupportLibrary = true

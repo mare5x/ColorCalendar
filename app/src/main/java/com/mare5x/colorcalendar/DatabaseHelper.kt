@@ -81,6 +81,19 @@ data class Entry(
 }
 
 
+fun isValidDatabaseFile(file: String): Boolean {
+    try {
+        val db = SQLiteDatabase.openDatabase(file, null, SQLiteDatabase.OPEN_READONLY)
+        val valid = (DatabaseUtils.queryNumEntries(db, DatabaseContract.ProfileEntryDB.TABLE_NAME) > 0 &&
+            DatabaseUtils.queryNumEntries(db, DatabaseContract.ProfileEntryDB.TABLE_NAME) >= 0)
+        db.close()
+        return valid
+    } catch (e: Exception) {
+        return false
+    }
+}
+
+
 fun queryAllProfiles(db: SQLiteDatabase): Array<ProfileEntry> {
     val profileDB = DatabaseContract.ProfileEntryDB
     val queryStr = """
@@ -134,9 +147,6 @@ fun queryAllEntries(db: SQLiteDatabase, profile: ProfileEntry) : Array<Entry> {
 
 
 class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
-    private var writableDB: SQLiteDatabase? = null
-    private var readableDB: SQLiteDatabase? = null
-
     // TODO execute database commands in a coroutine
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -162,10 +172,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         }
 
         try {
-            if (writableDB == null) {
-                writableDB = writableDatabase
-            }
-            return writableDB!!.insertOrThrow(profileDB.TABLE_NAME, null, values)
+            return writableDatabase.insertOrThrow(profileDB.TABLE_NAME, null, values)
         } catch (e: Exception) {
             Log.e(TAG, "insertProfile: ", e)
         }
@@ -181,18 +188,16 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             put(profileDB.PREF_COLOR, profile.prefColor)
             put(profileDB.CREATION_DATE, profile.creationDate.time)
         }
-        if (writableDB == null) writableDB = writableDatabase
-        writableDB!!.update(profileDB.TABLE_NAME, values, "${profileDB.ID} = ${profile.id}", null)
+        writableDatabase.update(profileDB.TABLE_NAME, values, "${profileDB.ID} = ${profile.id}", null)
         return profile.id
     }
 
     fun deleteProfile(profile: ProfileEntry) {
-        if (writableDB == null) writableDB = writableDatabase
-        writableDB!!.delete(
+        writableDatabase.delete(
             DatabaseContract.EntryDB.TABLE_NAME,
             "${DatabaseContract.EntryDB.PROFILE_FK} = ${profile.id}",
             null)
-        writableDB!!.delete(
+        writableDatabase.delete(
             DatabaseContract.ProfileEntryDB.TABLE_NAME,
             "${DatabaseContract.ProfileEntryDB.ID} = ${profile.id}",
             null
@@ -212,10 +217,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         }
 
         try {
-            if (writableDB == null) {
-                writableDB = writableDatabase
-            }
-            return writableDB!!.insertOrThrow(entryDB.TABLE_NAME, null, values)
+            return writableDatabase.insertOrThrow(entryDB.TABLE_NAME, null, values)
         } catch (e: Exception) {
             Log.e(TAG, "insertEntry: ", e)
         }
@@ -234,8 +236,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
         var cursor: Cursor? = null
         try {
-            if (readableDB == null) readableDB = readableDatabase
-            cursor = readableDB!!.rawQuery(queryStr, null)
+            cursor = writableDatabase.rawQuery(queryStr, null)
             cursor.moveToFirst()
             if (cursor.count == 0) {
                 return ProfileEntry()
@@ -258,8 +259,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     fun queryAllProfiles(): Array<ProfileEntry> {
-        if (readableDB == null) readableDB = readableDatabase
-        return queryAllProfiles(readableDB!!)
+        return queryAllProfiles(writableDatabase)
     }
 
     fun queryEntry(id: Long): Entry {
@@ -274,8 +274,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
         var cursor: Cursor? = null
         try {
-            if (readableDB == null) readableDB = readableDatabase
-            cursor = readableDB!!.rawQuery(queryStr, null)
+            cursor = writableDatabase.rawQuery(queryStr, null)
             cursor.moveToFirst()
             if (cursor.count == 0) {
                 return Entry()
@@ -295,8 +294,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     fun queryAllEntries(profile: ProfileEntry) : Array<Entry> {
-        if (readableDB == null) readableDB = readableDatabase
-        return queryAllEntries(readableDB!!, profile)
+        return queryAllEntries(writableDatabase, profile)
     }
 
     fun deleteDayEntries(profile: ProfileEntry, dayPosition: Int): Int {
@@ -310,8 +308,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         // means profile creation date MUST be earlier than entry date.
         // TODO check timezone issues?
 
-        if (writableDB == null) writableDB = writableDatabase
-        return writableDB!!.delete(entryDB.TABLE_NAME, whereStr, null)
+        return writableDatabase.delete(entryDB.TABLE_NAME, whereStr, null)
     }
 
     fun insertEntries(entries: Collection<Entry>) {
@@ -319,8 +316,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
 
         val entryDB = DatabaseContract.EntryDB
 
-        if (writableDB == null) writableDB = writableDatabase
-        writableDB!!.beginTransaction()
+        writableDatabase.beginTransaction()
         try {
             entries.forEach { entry ->
                 if (entry.profile == null || entry.profile!!.id < 0) {
@@ -331,13 +327,13 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
                     put(entryDB.VALUE, entry.value)
                     put(entryDB.PROFILE_FK, entry.profile!!.id)
                 }
-                writableDB!!.insertOrThrow(entryDB.TABLE_NAME, null, values)
+                writableDatabase.insertOrThrow(entryDB.TABLE_NAME, null, values)
             }
-            writableDB!!.setTransactionSuccessful()
+            writableDatabase.setTransactionSuccessful()
         } catch (e: Exception) {
             Log.e(TAG, "insertEntry: ", e)
         } finally {
-            writableDB!!.endTransaction()
+            writableDatabase.endTransaction()
         }
     }
 
@@ -349,8 +345,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             WHERE ${profileDB.PROFILE_NAME} = "$name"
         """.trimIndent()
 
-        if (readableDB == null) readableDB = readableDatabase
-        val cursor = readableDB!!.rawQuery(queryStr, null)
+        val cursor = writableDatabase.rawQuery(queryStr, null)
         cursor.moveToFirst()
         val res = Array(cursor.count) {
             val profile = ProfileEntry()
@@ -367,11 +362,6 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         }
         cursor.close()
         return res
-    }
-
-    fun getProfilesCount(): Long {
-        if (readableDB == null) readableDB = readableDatabase
-        return DatabaseUtils.queryNumEntries(readableDB, DatabaseContract.ProfileEntryDB.TABLE_NAME)
     }
 
     companion object {
