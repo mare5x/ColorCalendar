@@ -315,9 +315,29 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     fun insertEntries(entries: Collection<Entry>) {
-        // TODO bulk
-        entries.forEach { entry ->
-            insertEntry(entry)
+        // Bulk insert entries
+
+        val entryDB = DatabaseContract.EntryDB
+
+        if (writableDB == null) writableDB = writableDatabase
+        writableDB!!.beginTransaction()
+        try {
+            entries.forEach { entry ->
+                if (entry.profile == null || entry.profile!!.id < 0) {
+                    throw Exception("Invalid profile id for $entry")
+                }
+                val values = ContentValues().apply {
+                    put(entryDB.DATE, entry.date.time)
+                    put(entryDB.VALUE, entry.value)
+                    put(entryDB.PROFILE_FK, entry.profile!!.id)
+                }
+                writableDB!!.insertOrThrow(entryDB.TABLE_NAME, null, values)
+            }
+            writableDB!!.setTransactionSuccessful()
+        } catch (e: Exception) {
+            Log.e(TAG, "insertEntry: ", e)
+        } finally {
+            writableDB!!.endTransaction()
         }
     }
 
