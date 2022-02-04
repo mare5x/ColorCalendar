@@ -63,7 +63,7 @@ class ImportViewModelFactory(
     private val importPath: String,
     private val db: DatabaseHelper
 ) : ViewModelProvider.Factory {
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return ImportViewModel(importPath, db) as T
     }
 }

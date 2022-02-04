@@ -105,9 +105,7 @@ class EntriesViewModel(private val db: DatabaseHelper) : ViewModel() {
 }
 
 class ColorGridViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.Factory {
-
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return EntriesViewModel(db) as T
     }
 }

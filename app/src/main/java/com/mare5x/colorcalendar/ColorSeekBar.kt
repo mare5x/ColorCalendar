@@ -599,6 +599,7 @@ class ColorCircleBar : View {
         }
 
         companion object {
+            @JvmField
             val CREATOR = object : Parcelable.Creator<SavedState> {
                 override fun createFromParcel(parcel: Parcel): SavedState {
                     return SavedState(parcel)
