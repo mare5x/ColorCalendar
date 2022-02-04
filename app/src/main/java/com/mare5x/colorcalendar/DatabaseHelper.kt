@@ -146,6 +146,33 @@ fun queryAllEntries(db: SQLiteDatabase, profile: ProfileEntry) : Array<Entry> {
 }
 
 
+// Get the closest entry to the given date from a profile.
+fun queryClosestEntry(db: SQLiteDatabase, profile: ProfileEntry, date: Date) : Entry {
+    val entryDB = DatabaseContract.EntryDB
+
+    val queryStr = """
+        SELECT *
+        FROM ${entryDB.TABLE_NAME}
+        WHERE ${entryDB.PROFILE_FK} = ${profile.id}
+            AND ${entryDB.DATE} < ${date.time}
+        ORDER BY ${entryDB.DATE} DESC
+        LIMIT 1
+    """.trimIndent()
+
+    val entry = Entry()
+    val cursor = db.rawQuery(queryStr, null)
+    cursor.moveToFirst()
+    if (cursor.count > 0) {
+        entry.id = cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.ID))
+        entry.profile = profile
+        entry.date = Date(cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.DATE)))
+        entry.value = cursor.getFloat(cursor.getColumnIndexOrThrow(entryDB.VALUE))
+    }
+    cursor.close()
+    return entry
+}
+
+
 class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
     // TODO execute database commands in a coroutine
 
@@ -363,6 +390,9 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         cursor.close()
         return res
     }
+
+    fun queryClosestEntry(profile: ProfileEntry, date: Date) =
+        queryClosestEntry(readableDatabase, profile, date)
 
     companion object {
         val TAG = DatabaseHelper::class.simpleName ?: "null"

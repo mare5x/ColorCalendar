@@ -225,7 +225,8 @@ class MainActivity : AppCompatActivity(),
         }
 
         findViewById<FloatingActionButton>(R.id.entry_fab).setOnClickListener {
-            val dialog = EntryEditorDialog.create(currentProfile!!)
+            val e = profilesViewModel.getClosestEntry(currentProfile!!, Date())
+            val dialog = EntryEditorDialog.create(currentProfile!!, if (e.id < 0) null else e.value)
             dialog.show(supportFragmentManager, "entryEditor")
         }
         val scrollFab = findViewById<FloatingActionButton>(R.id.scroll_fab)

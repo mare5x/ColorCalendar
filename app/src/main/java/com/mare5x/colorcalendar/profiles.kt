@@ -17,6 +17,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.*
 
 typealias ProfileList = MutableList<ProfileEntry>
 
@@ -68,6 +69,10 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
 
     fun containsProfile(profile: ProfileEntry): Boolean {
         return getProfile(profile.id) != null
+    }
+
+    fun getClosestEntry(profile: ProfileEntry, date: Date): Entry {
+        return db.queryClosestEntry(profile, date)
     }
 }
 

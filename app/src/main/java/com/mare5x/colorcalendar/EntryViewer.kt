@@ -117,7 +117,10 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         entries = entriesViewModel.getEntriesByDay().value!![dayPosition].toMutableList()
 
         adapter = EntryAdapter(entries, profile) {
-            val dialog = EntryEditorDialog.create(profile)
+            val e = if (entries.isEmpty()) {
+                profilesViewModel.getClosestEntry(profile, makeDate(0, 0))
+            } else entries.first()
+            val dialog = EntryEditorDialog.create(profile, if (e.id < 0) null else e.value)
             dialog.show(childFragmentManager, "EntryEditorDialog")
         }
         val viewer = view.findViewById<EntryViewer>(R.id.entryViewer)
@@ -187,9 +190,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         }
     }
 
-    override fun onEntryCancel() {}
-
-    override fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) {
+    private fun makeDate(hourOfDay: Int, minute: Int) : Date {
         val s = Calendar.getInstance().get(Calendar.SECOND)
         val t = Calendar.getInstance().apply {
             time = profile.creationDate
@@ -198,10 +199,17 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
             set(Calendar.HOUR_OF_DAY, hourOfDay)
             add(Calendar.DAY_OF_MONTH, dayPosition)
         }
+        return t.time
+    }
+
+    override fun onEntryCancel() {}
+
+    override fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) {
+        val t = makeDate(hourOfDay, minute)
         val entry = Entry(
             profile = this.profile,
             value = value,
-            date = t.time
+            date = t
         )
         entries.add(entry)
         entriesChanged = true
@@ -265,9 +273,11 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         val args = requireArguments()
         val minColor = args.getInt(LOW_COLOR_KEY)
         val maxColor = args.getInt(HIGH_COLOR_KEY)
+        val barValue = args.getFloat(BAR_VALUE_KEY)
 
         val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorPickerBar)
         colorPickerBar.setColors(minColor, maxColor)
+        colorPickerBar.setNormProgress(barValue)
 
         savedInstanceState?.let { state ->
             hourOfDay = state.getInt(HOUR_KEY, hourOfDay)
@@ -326,11 +336,14 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         const val LOW_COLOR_KEY = "LOW_COLOR"
         const val HIGH_COLOR_KEY = "HIGH_COLOR_KEY"
 
-        fun create(profile: ProfileEntry): EntryEditorDialog {
+        const val BAR_VALUE_KEY = "BAR_VALUE"
+
+        fun create(profile: ProfileEntry, barValue: Float? = null): EntryEditorDialog {
             val fragment = EntryEditorDialog()
             fragment.arguments = Bundle().apply {
                 putInt(LOW_COLOR_KEY, profile.minColor)
                 putInt(HIGH_COLOR_KEY, profile.maxColor)
+                putFloat(BAR_VALUE_KEY, barValue ?: calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor))
             }
             return fragment
         }
