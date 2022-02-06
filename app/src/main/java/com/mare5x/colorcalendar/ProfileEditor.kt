@@ -10,12 +10,11 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Button
-import android.widget.DatePicker
-import android.widget.EditText
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.Fragment
 import java.text.DateFormat
 import java.util.*
 
@@ -144,10 +143,21 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     private lateinit var profileText: EditText
     private lateinit var colorBar: ColorSeekBar2
     private lateinit var dateButton: Button
+    private lateinit var circleSwitch: SwitchCompat
 
     private var profileId: Long = -1L  // Used when editing profile.
     private var profileCreationDate: Long = -1L
     private var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+        set(value) {
+            field = value
+            circleBar.setProfileType(value)
+            colorBar.profileType = value
+            when (value) {
+                ProfileType.TWO_COLOR_CIRCLE_SHORT -> circleSwitch.isChecked = false
+                ProfileType.TWO_COLOR_CIRCLE_LONG -> circleSwitch.isChecked = true
+            }
+            setUIColor(colorBar.getColor())
+        }
     private var forceSelection = false
 
     private var year: Int = 0
@@ -172,6 +182,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         circleBar = findViewById(R.id.colorCircleBar)
         profileText = findViewById(R.id.profileNameEdit)
         colorBar = findViewById(R.id.colorSeekBar)
+        circleSwitch = findViewById(R.id.circleSwitch)
         circleBar.onValueChanged = { _, _ ->
             colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
             setUIColor(colorBar.getColor())
@@ -183,6 +194,12 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         dateButton.setOnClickListener {
             DatePickerFragment.create(year, month, dayOfMonth).show(supportFragmentManager, "datePicker")
         }
+        circleSwitch.setOnCheckedChangeListener { _, isChecked ->
+            profileType = when (isChecked) {
+                false -> ProfileType.TWO_COLOR_CIRCLE_SHORT
+                true -> ProfileType.TWO_COLOR_CIRCLE_LONG
+            }
+        }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
         intent.getSerializableExtra(PROFILE_TYPE_KEY).let { type ->
@@ -190,8 +207,6 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             if (t != null)
                 profileType = t as ProfileType
         }
-        circleBar.setProfileType(profileType)
-        colorBar.profileType = profileType
 
         // NOTE: since time is measured since 1970, dates before that are negative!
         intent.getLongExtra(PROFILE_CREATION_DATE_KEY, -1L).let { date ->

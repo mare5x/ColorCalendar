@@ -23,4 +23,5 @@
     <string name="menu_import">Import</string>
     <string name="import_dialog_title">Confirm import</string>
     <string name="import_name_conflict">Name conflict!</string>
+    <string name="profile_edit_date">Select start date.</string>
 </resources>

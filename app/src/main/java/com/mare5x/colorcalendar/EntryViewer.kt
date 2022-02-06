@@ -115,12 +115,14 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         // Create a copy of this day's entries. Modify the list and finally update the view model/database
         // with the changes once editing has been finished.
         entries = entriesViewModel.getEntriesByDay().value!![dayPosition].toMutableList()
+        entries.sortDescending()
 
         adapter = EntryAdapter(entries, profile) {
             val e = if (entries.isEmpty()) {
                 profilesViewModel.getClosestEntry(profile, makeDate(0, 0))
-            } else entries.first()
-            val dialog = EntryEditorDialog.create(profile, if (e.id < 0) null else e.value)
+            } else entries.last()
+            // Don't compare by e.id because new entries don't have ids yet.
+            val dialog = EntryEditorDialog.create(profile, if (e.profile == null) null else e.value)
             dialog.show(childFragmentManager, "EntryEditorDialog")
         }
         val viewer = view.findViewById<EntryViewer>(R.id.entryViewer)
