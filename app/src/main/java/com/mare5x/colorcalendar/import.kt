@@ -20,15 +20,18 @@ import java.io.File
 
 
 // Importing process: copy selected backup file to internal storage, extract new profiles and entries.
-class ImportViewModel(importPath: String, db: DatabaseHelper) : ViewModel() {
+class ImportViewModel(importPath: String, db: DatabaseHelper, context: Context) : ViewModel() {
     var profilesToImport: Array<ProfileEntry>
     var entriesToImport: Array<List<Entry>>
 
     init {
-        val importDB = SQLiteDatabase.openDatabase(importPath, null, SQLiteDatabase.OPEN_READONLY)
+        // Open database with the helper class to support opening old database versions.
+        val importDBHelper = DatabaseHelper(context, importPath)
+        importDBHelper.setWriteAheadLoggingEnabled(false)
+        val importDB = importDBHelper.readableDatabase
 
         profilesToImport = queryAllProfiles(importDB)
-        entriesToImport = Array(profilesToImport.size) { emptyList<Entry>() }
+        entriesToImport = Array(profilesToImport.size) { emptyList() }
         profilesToImport.forEachIndexed { idx, profile ->
             // Profile comparison by name only
             val profiles = db.queryProfileName(profile.name)
@@ -53,7 +56,7 @@ class ImportViewModel(importPath: String, db: DatabaseHelper) : ViewModel() {
             }
         }
 
-        importDB.close()
+        importDBHelper.close()
         File(importPath).delete()
     }
 }
@@ -61,10 +64,11 @@ class ImportViewModel(importPath: String, db: DatabaseHelper) : ViewModel() {
 
 class ImportViewModelFactory(
     private val importPath: String,
-    private val db: DatabaseHelper
+    private val db: DatabaseHelper,
+    private val ctx: Context
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return ImportViewModel(importPath, db) as T
+        return ImportViewModel(importPath, db, ctx) as T
     }
 }
 
@@ -121,7 +125,7 @@ class ImportDialog : DialogFragment() {
     private val mainModel: MainViewModel by activityViewModels()
     private val viewModel: ImportViewModel by viewModels {
         val importPath = requireArguments().getString(IMPORT_PATH_KEY)!!
-        ImportViewModelFactory(importPath, mainModel.db)
+        ImportViewModelFactory(importPath, mainModel.db, requireContext())
     }
 
     private var listener: ImportDialogListener? = null

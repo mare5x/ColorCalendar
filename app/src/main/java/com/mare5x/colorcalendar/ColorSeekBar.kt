@@ -45,19 +45,31 @@ fun dimColor(color: Int, dim: Float) : Int {
     return Color.HSVToColor(hsv)
 }
 
-fun calcGradientColor(startColor: Int, endColor: Int, t: Float) : Int {
+fun calcGradientColor(startColor: Int, endColor: Int, t: Float, type: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT) : Int {
     val hsv1 = floatArrayOf(0f, 0f, 0f)
     Color.RGBToHSV(startColor.red, startColor.green, startColor.blue, hsv1)
     val hsv2 = floatArrayOf(0f, 0f, 0f)
     Color.RGBToHSV(endColor.red, endColor.green, endColor.blue, hsv2)
 
     // TODO try gamma 2.2 space?
-    // Hue value is in [0, 360]. The interpolation must take the shortest route -> modulo ...
-    if (abs(hsv2[0] - hsv1[0]) > 180) {
-        if (hsv1[0] in 0f..180f) {
-            hsv2[0] -= 360f
-        } else {
-            hsv1[0] -= 360f
+    // Hue value is in [0, 360].
+    if (type == ProfileType.TWO_COLOR_CIRCLE_SHORT) {
+        // The interpolation must take the shortest route -> modulo ...
+        if (abs(hsv2[0] - hsv1[0]) > 180) {
+            if (hsv1[0] in 0f..180f) {
+                hsv2[0] -= 360f
+            } else {
+                hsv1[0] -= 360f
+            }
+        }
+    } else {
+        // Take the long route
+        if (abs(hsv2[0] - hsv1[0]) < 180) {
+            if (hsv1[0] < hsv2[0]) {
+                hsv2[0] -= 360f
+            } else {
+                hsv1[0] -= 360f
+            }
         }
     }
     val h = ((1.0f - t) * hsv1[0] + t * hsv2[0] + 720f).rem(360f)  // Work-around for negative modulo ...
@@ -102,7 +114,7 @@ class ColorSeekBar2 : ColorSeekBar {
     }
 
     override fun updateGradientBackground() {
-        val bg = ColorGradientDrawable(startColor, endColor, fullHue)
+        val bg = ColorGradientDrawable(startColor, endColor, fullHue, profileType)
 
         // TODO this
         // progressDrawable = grad
@@ -121,6 +133,14 @@ open class ColorSeekBar : AppCompatSeekBar {
     protected var startColor: Int = Color.GRAY
     protected var endColor: Int = Color.GRAY
     protected var fullHue: Boolean = false
+
+    var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+        set(value) {
+            if (field != value) {
+                field = value
+                updateGradientBackground()
+            }
+        }
 
     var onValueChanged: (value: Float, color: Int) -> Unit = { _, _ -> }
 
@@ -178,7 +198,10 @@ open class ColorSeekBar : AppCompatSeekBar {
         if (fullHue) {
             return hueColor(getNormProgress())
         }
-        return calcGradientColor(startColor, endColor, getNormProgress())
+        return when (profileType) {
+            ProfileType.TWO_COLOR_CIRCLE_SHORT, ProfileType.TWO_COLOR_CIRCLE_LONG -> calcGradientColor(startColor, endColor, getNormProgress(), profileType)
+            else -> TODO()
+        }
     }
 }
 
@@ -221,13 +244,19 @@ class ColorPickerBar : ConstraintLayout {
         colorBar.setShowFullHue()
         updateColorRect()
     }
+
+    fun setProfileType(type: ProfileType) {
+        colorBar.profileType = type
+        updateColorRect()
+    }
 }
 
 val HUE_COLORS = intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA)
 
 class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
                             private var endColor: Int = Color.GRAY,
-                            private var fullHue: Boolean = false
+                            private var fullHue: Boolean = false,
+                            private var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
 ) : PaintDrawable() {
 
     init {
@@ -258,50 +287,49 @@ class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
         var alpha = hsv0[0] / 360f
         var beta = hsv1[0] / 360f
         val h = 1.0f / 6.0f
-        val eps = 0.001f
         // alpha == k0 / 6 + r0
         val r0 = alpha % h
         val k0: Int = (6 * (alpha - r0)).toInt()
-        val r1 = beta % h
-        val k1 = (6 * (beta - r1)).toInt()
 
-        if (abs(beta - alpha) > 0.5f) {
-            if (alpha <= 0.5f) {
-                beta -= 1.0f
-            } else {
-                alpha -= 1.0f
+        if (profileType == ProfileType.TWO_COLOR_CIRCLE_SHORT) {
+            if (abs(beta - alpha) > 0.5f) {
+                if (alpha <= 0.5f) {
+                    beta -= 1.0f
+                } else {
+                    alpha -= 1.0f
+                }
+            }
+        } else {
+            // Long route
+            if (abs(beta - alpha) < 0.5f) {
+                if (alpha < beta) {
+                    beta -= 1.0f
+                } else {
+                    alpha -= 1.0f
+                }
             }
         }
+
         val delta = abs(beta - alpha)
         val dir: Int = sign(beta - alpha).toInt()
 
-
-        // If both colors are in the same color strip, just linearly interpolate.
-        if (beta >= k0 / 6.0 - eps && beta <= (k0 + 1) / 6.0 + eps) {
-            return LinearGradient(0f, 0f, width, 0f, startColor, endColor, Shader.TileMode.CLAMP)
-        }
-
-        val n = 2 + abs(if (dir > 0) (k1 - k0) else (k0 - k1))
-
-        val st = if (dir > 0) 0 else 1
-        val colors = IntArray(n) { i ->
-            when (i) {
-                0 -> startColor
-                n - 1 -> endColor
-                else -> HUE_COLORS[(k0 + i * dir + 12 + st) % 6]
+        var colors = IntArray(12)
+        var offsets = FloatArray(12)
+        val st = if (dir > 0) 0 else 1  // Necessary correction depending on direction
+        var n = 0
+        colors[n] = startColor
+        while (offsets[n] < 1f) {
+            n += 1
+            colors[n] = HUE_COLORS[(k0 + n * dir + st).mod(6)]
+            if (n == 1) {
+                offsets[n] = min(1f, (if (dir > 0) (h - r0) else r0) / delta)
+            } else {
+                offsets[n] = min(1f, offsets[n - 1] + h / delta)
             }
         }
-        var prev = 0f
-        val offsets = FloatArray(n) { i ->
-            val x = when (i) {
-                0 -> 0f
-                1 -> (if (dir > 0) (h - r0) else r0) / delta
-                n - 1 -> 1f
-                else -> h / delta + prev
-            }
-            prev = x
-            x
-        }
+        colors[n] = endColor
+        colors = colors.sliceArray(0..n)
+        offsets = offsets.sliceArray(0..n)
 
         // Color and position arrays must be of equal length.
         return LinearGradient(0f, 0f, width, 0f, colors, offsets, Shader.TileMode.CLAMP)
@@ -377,6 +405,8 @@ class ColorCircleBar : View {
 
     var onValueChanged: (value0: Float, value1: Float) -> Unit = { _, _ ->  }
 
+    private var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+
     private var circleRadius: Float = 0f  // px units
     private val centerPoint: PointF = PointF()  // local px units
     private val thumb0 = BarThumb(Color.RED).apply {
@@ -413,11 +443,21 @@ class ColorCircleBar : View {
         }
         var thumb0Angle = (1 - thumb0.progress) * 360f
         var thumb1Angle = (1 - thumb1.progress) * 360f
-        if (abs(thumb1Angle - thumb0Angle) > 180f) {
-            if (thumb0Angle <= 180f) {
-                thumb1Angle -= 360f
-            } else {
-                thumb0Angle -= 360f
+        if (profileType == ProfileType.TWO_COLOR_CIRCLE_SHORT) {
+            if (abs(thumb1Angle - thumb0Angle) > 180f) {
+                if (thumb0Angle <= 180f) {
+                    thumb1Angle -= 360f
+                } else {
+                    thumb0Angle -= 360f
+                }
+            }
+        } else {
+            if (abs(thumb1Angle - thumb0Angle) < 180f) {
+                if (thumb0Angle < thumb1Angle) {
+                    thumb1Angle -= 360f
+                } else {
+                    thumb0Angle -= 360f
+                }
             }
         }
 
@@ -558,6 +598,13 @@ class ColorCircleBar : View {
         Color.colorToHSV(color, hsv)
         thumb1.progress = hsv[0] / 360f
         invalidate()
+    }
+
+    fun setProfileType(type: ProfileType) {
+        if (type != profileType) {
+            this.profileType = type
+            invalidate()
+        }
     }
 
     override fun onSaveInstanceState(): Parcelable? {

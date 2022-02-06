@@ -14,7 +14,7 @@ import java.util.*
 // https://developer.android.com/training/data-storage/sqlite#DefineContract
 object DatabaseContract {
     const val DB_NAME = "database.db"
-    const val DB_VERSION = 1
+    const val DB_VERSION = 2
 
     object ProfileEntryDB : BaseColumns {
         const val ID = BaseColumns._ID
@@ -24,6 +24,7 @@ object DatabaseContract {
         const val MAX_COLOR = "max_color"
         const val PREF_COLOR = "pref_color"
         const val CREATION_DATE = "creation_date"
+        const val PROFILE_TYPE = "profile_type"
 
         const val DB_CREATE = """
             CREATE TABLE ${TABLE_NAME}(
@@ -32,7 +33,8 @@ object DatabaseContract {
                 $MIN_COLOR INTEGER NOT NULL,
                 $MAX_COLOR INTEGER NOT NULL,
                 $PREF_COLOR INTEGER NOT NULL,
-                $CREATION_DATE INTEGER NOT NULL
+                $CREATION_DATE INTEGER NOT NULL,
+                $PROFILE_TYPE INTEGER NOT NULL
             );
         """
     }
@@ -58,13 +60,26 @@ object DatabaseContract {
 }
 
 
+enum class ProfileType(val value: Int) {
+    TWO_COLOR_CIRCLE_SHORT(0),  // 0 must be default for old database compatibility
+    TWO_COLOR_CIRCLE_LONG(1),
+    ONE_COLOR_SHADE(2),
+    FREE_COLOR(3),
+    BOOLEAN_COLOR(4);
+
+    companion object {
+        fun fromInt(value: Int) = values().first { value == it.value }
+    }
+}
+
 data class ProfileEntry(
     var id: Long = -1,
     var name: String = "null",
     var minColor: Int = 0,
     var maxColor: Int = 0,
     var prefColor: Int = 0,
-    var creationDate: Date = Date()
+    var creationDate: Date = Date(),
+    var type: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
 )
 
 data class Entry(
@@ -94,6 +109,22 @@ fun isValidDatabaseFile(file: String): Boolean {
 }
 
 
+fun readProfileEntry(cursor: Cursor) : ProfileEntry {
+    val profileDB = DatabaseContract.ProfileEntryDB
+    val profile = ProfileEntry()
+    with (cursor) {
+        profile.id = getLong(getColumnIndexOrThrow(profileDB.ID))
+        profile.name = getString(getColumnIndexOrThrow(profileDB.PROFILE_NAME))
+        profile.minColor = getInt(getColumnIndexOrThrow(profileDB.MIN_COLOR))
+        profile.maxColor = getInt(getColumnIndexOrThrow(profileDB.MAX_COLOR))
+        profile.prefColor = getInt(getColumnIndexOrThrow(profileDB.PREF_COLOR))
+        profile.creationDate = Date(getLong(getColumnIndexOrThrow(profileDB.CREATION_DATE)))
+        profile.type = ProfileType.fromInt(getInt(getColumnIndexOrThrow(profileDB.PROFILE_TYPE)))
+    }
+    return profile
+}
+
+
 fun queryAllProfiles(db: SQLiteDatabase): Array<ProfileEntry> {
     val profileDB = DatabaseContract.ProfileEntryDB
     val queryStr = """
@@ -104,16 +135,8 @@ fun queryAllProfiles(db: SQLiteDatabase): Array<ProfileEntry> {
     val cursor = db.rawQuery(queryStr, null)
     cursor.moveToFirst()
     val res = Array(cursor.count) {
-        val profile = ProfileEntry()
-        with(cursor) {
-            profile.id = getLong(getColumnIndexOrThrow(profileDB.ID))
-            profile.name = getString(getColumnIndexOrThrow(profileDB.PROFILE_NAME))
-            profile.minColor = getInt(getColumnIndexOrThrow(profileDB.MIN_COLOR))
-            profile.maxColor = getInt(getColumnIndexOrThrow(profileDB.MAX_COLOR))
-            profile.prefColor = getInt(getColumnIndexOrThrow(profileDB.PREF_COLOR))
-            profile.creationDate = Date(getLong(getColumnIndexOrThrow(profileDB.CREATION_DATE)))
-            moveToNext()
-        }
+        val profile = readProfileEntry(cursor)
+        cursor.moveToNext()
         profile
     }
     cursor.close()
@@ -173,7 +196,9 @@ fun queryClosestEntry(db: SQLiteDatabase, profile: ProfileEntry, date: Date) : E
 }
 
 
-class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
+class DatabaseHelper : SQLiteOpenHelper {
+    constructor(ctx : Context) : super(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION)
+    constructor(ctx : Context?, name: String) : super(ctx, name, null, DatabaseContract.DB_VERSION)
     // TODO execute database commands in a coroutine
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -182,10 +207,20 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         db.execSQL(DatabaseContract.EntryDB.DB_CREATE)
     }
 
+    override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        super.onDowngrade(db, oldVersion, newVersion)
+        // TODO?
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS ${DatabaseContract.ProfileEntryDB.TABLE_NAME};")
-        db.execSQL("DROP TABLE IF EXISTS ${DatabaseContract.EntryDB.TABLE_NAME};")
-        onCreate(db)
+        if (oldVersion == 1 && newVersion == 2) {
+            // Added ProfileType
+            val profileDB = DatabaseContract.ProfileEntryDB
+            db.execSQL("""
+                ALTER TABLE ${profileDB.TABLE_NAME}
+                ADD COLUMN ${profileDB.PROFILE_TYPE} INTEGER NOT NULL DEFAULT 0
+            """.trimIndent())
+        }
     }
 
     fun insertProfile(profile: ProfileEntry): Long {
@@ -196,6 +231,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             put(profileDB.MAX_COLOR, profile.maxColor)
             put(profileDB.PREF_COLOR, profile.prefColor)
             put(profileDB.CREATION_DATE, profile.creationDate.time)
+            put(profileDB.PROFILE_TYPE, profile.type.value)
         }
 
         try {
@@ -214,6 +250,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             put(profileDB.MAX_COLOR, profile.maxColor)
             put(profileDB.PREF_COLOR, profile.prefColor)
             put(profileDB.CREATION_DATE, profile.creationDate.time)
+            put(profileDB.PROFILE_TYPE, profile.type.value)
         }
         writableDatabase.update(profileDB.TABLE_NAME, values, "${profileDB.ID} = ${profile.id}", null)
         return profile.id
@@ -252,7 +289,6 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     fun queryProfile(id: Long): ProfileEntry {
-        val profile = ProfileEntry()
         val profileDB = DatabaseContract.ProfileEntryDB
 
         val queryStr = """
@@ -261,27 +297,11 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
             WHERE _id = $id
         """.trimIndent()
 
-        var cursor: Cursor? = null
-        try {
-            cursor = writableDatabase.rawQuery(queryStr, null)
-            cursor.moveToFirst()
-            if (cursor.count == 0) {
-                return ProfileEntry()
-            }
-
-            with(cursor) {
-                profile.id = id
-                profile.name = getString(getColumnIndexOrThrow(profileDB.PROFILE_NAME))
-                profile.minColor = getInt(getColumnIndexOrThrow(profileDB.MIN_COLOR))
-                profile.maxColor = getInt(getColumnIndexOrThrow(profileDB.MAX_COLOR))
-                profile.prefColor = getInt(getColumnIndexOrThrow(profileDB.PREF_COLOR))
-                profile.creationDate = Date(getLong(getColumnIndexOrThrow(profileDB.CREATION_DATE)))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "queryProfile: ", e)
-        } finally {
-            cursor?.close()
-        }
+        val cursor = writableDatabase.rawQuery(queryStr, null)
+        cursor.moveToFirst()
+        val profile = if (cursor.count == 0) ProfileEntry()
+                      else readProfileEntry(cursor)
+        cursor.close()
         return profile
     }
 
@@ -375,16 +395,8 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
         val cursor = writableDatabase.rawQuery(queryStr, null)
         cursor.moveToFirst()
         val res = Array(cursor.count) {
-            val profile = ProfileEntry()
-            with(cursor) {
-                profile.id = getLong(getColumnIndexOrThrow(profileDB.ID))
-                profile.name = getString(getColumnIndexOrThrow(profileDB.PROFILE_NAME))
-                profile.minColor = getInt(getColumnIndexOrThrow(profileDB.MIN_COLOR))
-                profile.maxColor = getInt(getColumnIndexOrThrow(profileDB.MAX_COLOR))
-                profile.prefColor = getInt(getColumnIndexOrThrow(profileDB.PREF_COLOR))
-                profile.creationDate = Date(getLong(getColumnIndexOrThrow(profileDB.CREATION_DATE)))
-                moveToNext()
-            }
+            val profile = readProfileEntry(cursor)
+            cursor.moveToNext()
             profile
         }
         cursor.close()
@@ -392,7 +404,7 @@ class DatabaseHelper(ctx : Context) : SQLiteOpenHelper(ctx, DatabaseContract.DB_
     }
 
     fun queryClosestEntry(profile: ProfileEntry, date: Date) =
-        queryClosestEntry(readableDatabase, profile, date)
+        queryClosestEntry(writableDatabase, profile, date)
 
     companion object {
         val TAG = DatabaseHelper::class.simpleName ?: "null"

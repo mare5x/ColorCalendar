@@ -61,7 +61,7 @@ class EntryAdapter(
         when (holder) {
             is EntryViewHolder -> {
                 val entry = entries[position]
-                holder.colorItem.setColor(calcGradientColor(profile.minColor, profile.maxColor, entry.value))
+                holder.colorItem.setColor(calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.type))
                 holder.entryText.text = entryDateFormat.format(entry.date)
             }
             is AdderViewHolder -> {
@@ -274,10 +274,12 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         val minColor = args.getInt(LOW_COLOR_KEY)
         val maxColor = args.getInt(HIGH_COLOR_KEY)
         val barValue = args.getFloat(BAR_VALUE_KEY)
+        val profileType = args.getSerializable(PROFILE_TYPE) as ProfileType
 
         val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorPickerBar)
         colorPickerBar.setColors(minColor, maxColor)
         colorPickerBar.setNormProgress(barValue)
+        colorPickerBar.setProfileType(profileType)
 
         savedInstanceState?.let { state ->
             hourOfDay = state.getInt(HOUR_KEY, hourOfDay)
@@ -332,11 +334,10 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
 
         const val HOUR_KEY = "HOUR_KEY"
         const val MINUTE_KEY = "MINUTE_KEY"
-
         const val LOW_COLOR_KEY = "LOW_COLOR"
         const val HIGH_COLOR_KEY = "HIGH_COLOR_KEY"
-
         const val BAR_VALUE_KEY = "BAR_VALUE"
+        const val PROFILE_TYPE = "PROFILE_TYPE"
 
         fun create(profile: ProfileEntry, barValue: Float? = null): EntryEditorDialog {
             val fragment = EntryEditorDialog()
@@ -344,6 +345,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
                 putInt(LOW_COLOR_KEY, profile.minColor)
                 putInt(HIGH_COLOR_KEY, profile.maxColor)
                 putFloat(BAR_VALUE_KEY, barValue ?: calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor))
+                putSerializable(PROFILE_TYPE, profile.type)
             }
             return fragment
         }

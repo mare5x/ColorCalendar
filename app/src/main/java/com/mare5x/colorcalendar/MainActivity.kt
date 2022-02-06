@@ -295,6 +295,7 @@ class MainActivity : AppCompatActivity(),
                         putExtra(ProfileEditorActivity.PROFILE_MAX_COLOR_KEY, profile.maxColor)
                         putExtra(ProfileEditorActivity.PROFILE_PREF_COLOR_KEY, profile.prefColor)
                         putExtra(ProfileEditorActivity.PROFILE_CREATION_DATE_KEY, profile.creationDate.time)
+                        putExtra(ProfileEditorActivity.PROFILE_TYPE_KEY, profile.type)
                     }
                 }
                 startActivityForResult(intent, PROFILE_EDITOR_CODE)
@@ -337,6 +338,7 @@ class MainActivity : AppCompatActivity(),
                         if (date == -1L) Date()
                         else Date(date)
                     }
+                    profile.type = bundle.getSerializable(ProfileEditorActivity.PROFILE_TYPE_KEY) as ProfileType
                     if (profile.id == -1L) {
                         mainViewModel.insertProfile(profile)
                     } else {

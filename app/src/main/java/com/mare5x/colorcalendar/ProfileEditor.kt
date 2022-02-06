@@ -144,8 +144,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     private lateinit var profileText: EditText
     private lateinit var colorBar: ColorSeekBar2
     private lateinit var dateButton: Button
+
     private var profileId: Long = -1L  // Used when editing profile.
     private var profileCreationDate: Long = -1L
+    private var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
     private var forceSelection = false
 
     private var year: Int = 0
@@ -183,6 +185,13 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
+        intent.getSerializableExtra(PROFILE_TYPE_KEY).let { type ->
+            val t = savedInstanceState?.getSerializable(PROFILE_TYPE_KEY) ?: type
+            if (t != null)
+                profileType = t as ProfileType
+        }
+        circleBar.setProfileType(profileType)
+        colorBar.profileType = profileType
 
         // NOTE: since time is measured since 1970, dates before that are negative!
         intent.getLongExtra(PROFILE_CREATION_DATE_KEY, -1L).let { date ->
@@ -272,6 +281,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1())
             putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
             putExtra(PROFILE_CREATION_DATE_KEY, profileCreationDate)
+            putExtra(PROFILE_TYPE_KEY, profileType)
         }
         setResult(RESULT_OK, intent)
     }
@@ -301,11 +311,12 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
 
-        // So that teh set date is not lost on configuration change.
+        // So that the set date is not lost on configuration change.
         outState.apply {
             putInt(YEAR_KEY, year)
             putInt(MONTH_KEY, month)
             putInt(DAY_KEY, dayOfMonth)
+            putSerializable(PROFILE_TYPE_KEY, profileType)
         }
     }
 
@@ -321,5 +332,6 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         const val PROFILE_MAX_COLOR_KEY = "profile_max_color_key"
         const val PROFILE_PREF_COLOR_KEY = "profile_pref_color_key"
         const val PROFILE_CREATION_DATE_KEY = "profile_creation_date_key"
+        const val PROFILE_TYPE_KEY = "profile_type_key"
     }
 }
