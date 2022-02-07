@@ -9,12 +9,13 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
-import android.widget.*
+import android.view.*
+import android.widget.DatePicker
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
 import com.mare5x.colorcalendar.databinding.ActivityProfileEditorBinding
+import com.mare5x.colorcalendar.databinding.DialogColorPickerBinding
 import java.text.DateFormat
 import java.util.*
 
@@ -138,7 +139,59 @@ class DatePickerFragment : DialogFragment() {
 }
 
 
-class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener {
+class ColorPickerFragment : DialogFragment() {
+    interface ColorPickerListener {
+        fun onColorConfirm(color: Int)
+        fun onColorCancel() { }
+    }
+
+    private lateinit var listener: ColorPickerListener
+    private var _binding: DialogColorPickerBinding? = null
+    private val binding get() = _binding!!
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        _binding = DialogColorPickerBinding.inflate(inflater, container, false)
+        return _binding?.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        binding.colorRect.setColor(binding.colorPickerCircle.getThumbColor(0))
+
+        binding.colorPickerCircle.onValueChanged = { thumbs ->
+            binding.colorRect.setColor(thumbs.first())
+        }
+
+        binding.cancelButton.setOnClickListener {
+            listener.onColorCancel()
+            if (showsDialog)
+                dismiss()
+        }
+        binding.confirmButton.setOnClickListener {
+            listener.onColorConfirm(binding.colorPickerCircle.getThumbColor(0))
+            if (showsDialog)
+                dismiss()
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as ColorPickerListener
+    }
+}
+
+
+class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerFragment.ColorPickerListener {
     private lateinit var binding: ActivityProfileEditorBinding
     private lateinit var circleBar: ColorCircleBar
     private lateinit var colorBar: ColorSeekBar2
@@ -202,7 +255,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
             updateUIColor()
         }
-        colorBar.onValueChanged = { _, prefColor ->
+        colorBar.onValueChanged = { _, _ ->
             updateUIColor()
         }
         binding.dateButton.setOnClickListener {
@@ -219,6 +272,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         }
         binding.freeRadioButton.setOnClickListener {
             profileFlags = profileFlags.setFlag1(ProfileFlag.FREE_PREF_COLOR)
+        }
+
+        binding.profileColorButton.setOnClickListener {
+            ColorPickerFragment().show(supportFragmentManager, "colorPicker")
         }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
@@ -255,13 +312,17 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         colorBar.setNormProgress(0.8f)
         colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
 
-        intent.getIntExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor()).let { color ->
-
-            colorBar.setNormProgress(calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), color, profileType))
-        }
-
         intent.getIntExtra(PROFILE_FLAGS_KEY, 0).let { flags ->
             profileFlags = savedInstanceState?.getInt(PROFILE_FLAGS_KEY, flags) ?: flags
+        }
+
+        intent.getIntExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor()).let { color ->
+            val c = savedInstanceState?.getInt(PROFILE_PREF_COLOR_KEY, color) ?: color
+            prefColor = c
+            binding.profileColorButton.color = c
+            if (profileFlags hasFlagNot ProfileFlag.FREE_PREF_COLOR) {
+                colorBar.setNormProgress(calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), c, profileType))
+            }
         }
 
         updateUIColor()
@@ -318,7 +379,9 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putExtra(PROFILE_NAME_KEY, binding.profileNameEdit.text.toString())
             putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0())
             putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1())
-            putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
+            putExtra(PROFILE_PREF_COLOR_KEY,
+                if (profileFlags hasFlag ProfileFlag.FREE_PREF_COLOR) prefColor
+                else colorBar.getColor())
             putExtra(PROFILE_CREATION_DATE_KEY, profileCreationDate)
             putExtra(PROFILE_TYPE_KEY, profileType)
             putExtra(PROFILE_FLAGS_KEY, profileFlags)
@@ -356,6 +419,12 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         binding.dateButton.text = DateFormat.getDateInstance().format(Date(profileCreationDate))
     }
 
+    override fun onColorConfirm(color: Int) {
+        prefColor = color
+        binding.profileColorButton.color = color
+        profileFlags = profileFlags.setFlag1(ProfileFlag.FREE_PREF_COLOR)
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
 
@@ -366,6 +435,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putInt(DAY_KEY, dayOfMonth)
             putSerializable(PROFILE_TYPE_KEY, profileType)
             putInt(PROFILE_FLAGS_KEY, profileFlags)
+            putInt(PROFILE_PREF_COLOR_KEY, prefColor)
         }
     }
 

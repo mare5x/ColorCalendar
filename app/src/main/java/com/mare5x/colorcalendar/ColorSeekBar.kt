@@ -125,7 +125,7 @@ fun calcGradientProgress(startColor: Int, endColor: Int, midColor: Int, type: Pr
     // return circleDistance(hsvStart[0], hsvMid[0], type) / circleDistance(hsvStart[0], hsvEnd[0], type)
 }
 
-fun hueColor(t: Float) = Color.HSVToColor(floatArrayOf(t * 360f, 1.0f, 1.0f))
+fun hueColor(h: Float, s: Float = 1f, v: Float = 1f) = Color.HSVToColor(floatArrayOf(h * 360f, s, v))
 
 fun createGradientBitmap(startColor: Int, endColor: Int, width: Int) : Bitmap {
     val pixels = IntArray(width) { i ->
@@ -409,7 +409,8 @@ class BarThumb(color: Int) {
     var touchPoint = PointF()
 
     var centerPoint = PointF()
-    var progress: Float = 0f  // in range [0, 1]
+    var angleProgress: Float = 0f  // in range [0, 1]
+    var radiusProgress: Float = 1f  // in range [0, 1]
 
     var isDragging: Boolean = false
     var radius: Float = 0f  // px units
@@ -417,9 +418,10 @@ class BarThumb(color: Int) {
     private var drawable: Drawable = ThumbDrawable(color)
 
     fun updatePosition(circleCenter: PointF, circleRadius: Float) {
-        val phi: Float = (progress * 2f * PI).toFloat()
+        val phi: Float = (angleProgress * 2f * PI).toFloat()
+        val r: Float = radiusProgress * circleRadius
         centerPoint.apply {
-            set(cos(phi) * circleRadius, -sin(phi) * circleRadius)
+            set(cos(phi) * r, -sin(phi) * r)
             offset(circleCenter.x, circleCenter.y)
         }
     }
@@ -446,11 +448,11 @@ class ColorCircleBar : View {
     private var circleRadius: Float = 0f  // px units
     private val centerPoint: PointF = PointF()  // local px units
     private val thumb0 = BarThumb(Color.RED).apply {
-        progress = 0f
+        angleProgress = 0f
     }
     private val thumb1 = BarThumb(Color.GREEN).apply {
         val hsv = FloatArray(3)
-        progress = Color.colorToHSV(Color.GREEN, hsv).let { hsv[0] / 360f }
+        angleProgress = Color.colorToHSV(Color.GREEN, hsv).let { hsv[0] / 360f }
     }
     private val thumbs = listOf(thumb0, thumb1)
 
@@ -477,8 +479,8 @@ class ColorCircleBar : View {
             right = centerPoint.x + circleRadius
             bottom = centerPoint.y + circleRadius
         }
-        var thumb0Angle = (1 - thumb0.progress) * 360f
-        var thumb1Angle = (1 - thumb1.progress) * 360f
+        var thumb0Angle = (1 - thumb0.angleProgress) * 360f
+        var thumb1Angle = (1 - thumb1.angleProgress) * 360f
         if (profileType == ProfileType.CIRCLE_SHORT) {
             if (abs(thumb1Angle - thumb0Angle) > 180f) {
                 if (thumb0Angle <= 180f) {
@@ -609,30 +611,30 @@ class ColorCircleBar : View {
 
         var progress = phi / (2 * PI)
         progress = if (progress < 0) (1 + progress) else (progress)
-        thumb.progress = progress.toFloat()
+        thumb.angleProgress = progress.toFloat()
         thumb.updatePosition(centerPoint, circleRadius)
 
-        onValueChanged(thumb0.progress, thumb1.progress)
+        onValueChanged(thumb0.angleProgress, thumb1.angleProgress)
 
         // TODO invalidate drawable
         invalidate()
         return true
     }
 
-    fun getColor0(): Int = hueColor(thumb0.progress)
-    fun getColor1(): Int = hueColor(thumb1.progress)
+    fun getColor0(): Int = hueColor(thumb0.angleProgress)
+    fun getColor1(): Int = hueColor(thumb1.angleProgress)
 
     fun setColor0(color: Int) {
         val hsv = FloatArray(3)
         Color.colorToHSV(color, hsv)
-        thumb0.progress = hsv[0] / 360f
+        thumb0.angleProgress = hsv[0] / 360f
         invalidate()
     }
 
     fun setColor1(color: Int) {
         val hsv = FloatArray(3)
         Color.colorToHSV(color, hsv)
-        thumb1.progress = hsv[0] / 360f
+        thumb1.angleProgress = hsv[0] / 360f
         invalidate()
     }
 
@@ -645,8 +647,8 @@ class ColorCircleBar : View {
 
     override fun onSaveInstanceState(): Parcelable? {
         val state = SavedState(super.onSaveInstanceState())
-        state.thumb0Progress = thumb0.progress
-        state.thumb1Progress = thumb1.progress
+        state.thumb0Progress = thumb0.angleProgress
+        state.thumb1Progress = thumb1.angleProgress
         return state
     }
 
@@ -658,9 +660,9 @@ class ColorCircleBar : View {
 
         super.onRestoreInstanceState(state.superState)
 
-        thumb0.progress = state.thumb0Progress
-        thumb1.progress = state.thumb1Progress
-        onValueChanged(thumb0.progress, thumb1.progress)
+        thumb0.angleProgress = state.thumb0Progress
+        thumb1.angleProgress = state.thumb1Progress
+        onValueChanged(thumb0.angleProgress, thumb1.angleProgress)
         invalidate()
     }
 
@@ -679,6 +681,275 @@ class ColorCircleBar : View {
             super.writeToParcel(out, flags)
             out.writeFloat(thumb0Progress)
             out.writeFloat(thumb1Progress)
+        }
+
+        companion object {
+            @JvmField
+            val CREATOR = object : Parcelable.Creator<SavedState> {
+                override fun createFromParcel(parcel: Parcel): SavedState {
+                    return SavedState(parcel)
+                }
+
+                override fun newArray(size: Int): Array<SavedState?> {
+                    return Array(size) { null }
+                }
+            }
+        }
+    }
+}
+
+
+class HSVCircleBar : View {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    var onValueChanged: (thumbs: List<Int>) -> Unit = { _ ->  }
+
+    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
+
+    private var circleRadius: Float = 0f  // px units
+    private val centerPoint: PointF = PointF()  // local px units
+
+    private val thumbs: MutableList<BarThumb> = mutableListOf()
+
+    private val huePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val saturationPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val trackPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        color = Color.GRAY
+        strokeWidth = 2f
+    }
+
+    private var padding: Float = 8f  // dp units
+    private var thumbDetectionRadius: Float = 4f  // dp units
+    private var thumbRadius: Float = 12f  // dp units
+
+    private var thumbArcEnabled = false
+    private var arcRect = RectF()
+
+    init {
+        addThumb(Color.RED, Color.RED)
+        // addThumb(Color.GREEN, Color.GREEN)
+    }
+
+    private fun drawThumbArc(canvas: Canvas) {
+        arcRect.apply {
+            left = centerPoint.x - circleRadius
+            top = centerPoint.y - circleRadius
+            right = centerPoint.x + circleRadius
+            bottom = centerPoint.y + circleRadius
+        }
+        var thumb0Angle = (1 - thumbs[0].angleProgress) * 360f
+        var thumb1Angle = (1 - thumbs[1].angleProgress) * 360f
+        if (profileType == ProfileType.CIRCLE_SHORT) {
+            if (abs(thumb1Angle - thumb0Angle) > 180f) {
+                if (thumb0Angle <= 180f) {
+                    thumb1Angle -= 360f
+                } else {
+                    thumb0Angle -= 360f
+                }
+            }
+        } else {
+            if (abs(thumb1Angle - thumb0Angle) < 180f) {
+                if (thumb0Angle < thumb1Angle) {
+                    thumb1Angle -= 360f
+                } else {
+                    thumb0Angle -= 360f
+                }
+            }
+        }
+        canvas.drawArc(arcRect, thumb0Angle, thumb1Angle - thumb0Angle, false, trackPaint)
+    }
+
+    override fun onDraw(canvas: Canvas?) {
+        canvas?.let{
+            it.drawCircle(centerPoint.x, centerPoint.y, circleRadius, huePaint)
+            it.drawCircle(centerPoint.x, centerPoint.y, circleRadius, saturationPaint)
+            if (thumbArcEnabled) {
+                drawThumbArc(it)
+            }
+            thumbs.forEach { thumb -> thumb.draw(canvas) }
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+
+        centerPoint.set(w * 0.5f, h * 0.5f)
+
+        val scale = resources.displayMetrics.density
+        thumbRadius = 12f * scale
+        val a = min(w, h) - 2f * scale * padding
+        circleRadius = 0.5f * a - thumbRadius
+
+        val hueShader = SweepGradient(centerPoint.x, centerPoint.y, intArrayOf(
+            Color.RED, Color.MAGENTA, Color.BLUE, Color.CYAN,
+            Color.GREEN, Color.YELLOW, Color.RED
+        ), null)
+        huePaint.shader = hueShader
+
+        // Idea from: https://github.com/skydoves/ColorPickerView/blob/master/colorpickerview/src/main/java/com/skydoves/colorpickerview/ColorHsvPalette.java
+        val saturationShader = RadialGradient(centerPoint.x, centerPoint.y, circleRadius,
+            Color.WHITE, 0x00FFFFFF, Shader.TileMode.CLAMP)
+        saturationPaint.shader = saturationShader
+
+        thumbs.forEach {
+            it.radius = thumbRadius
+            it.updatePosition(centerPoint, circleRadius)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        return when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                var touchHandled = false
+                val detectionRadius = thumbDetectionRadius * resources.displayMetrics.density + thumbRadius
+
+                val pointerIndex = event.actionIndex
+                val pointerID = event.getPointerId(pointerIndex)
+
+                val touchPoint = PointF(event.getX(pointerIndex), event.getY(pointerIndex))
+                val r = hypot(touchPoint.x - centerPoint.x, touchPoint.y - centerPoint.y)
+                if (r <= circleRadius + detectionRadius) {
+                    performClick()
+                    val thumb = closestThumbTo(touchPoint)
+                    if (thumb != null) {
+                        thumb.pointerID = pointerID
+                        thumb.touchPoint = touchPoint
+                        thumb.isDragging = true
+                        touchHandled = handleTouch(thumb) || touchHandled
+                    }
+                }
+                touchHandled
+            }
+            MotionEvent.ACTION_MOVE -> {
+                var touchHandled = false
+                for (thumb in thumbs) {
+                    if (thumb.pointerID != INVALID_POINTER_ID) {
+                        event.findPointerIndex(thumb.pointerID).let { index ->
+                            if (index != INVALID_POINTER_ID) {
+                                thumb.touchPoint.set(event.getX(index), event.getY(index))
+                                touchHandled = handleTouch(thumb) || touchHandled
+                            }
+                        }
+                    }
+                }
+                true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                for (thumb in thumbs) {
+                    thumb.pointerID = INVALID_POINTER_ID
+                    thumb.isDragging = false
+                }
+                true
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val pointerIndex = event.actionIndex
+                val pointerID = event.getPointerId(pointerIndex)
+                for (thumb in thumbs) {
+                    if (thumb.pointerID != INVALID_POINTER_ID && thumb.pointerID == pointerID) {
+                        thumb.pointerID = INVALID_POINTER_ID
+                        thumb.isDragging = false
+                    }
+                }
+                true
+            }
+            else -> super.onTouchEvent(event)
+        }
+    }
+
+    // Closest Thumb to point that isn't being used.
+    private fun closestThumbTo(point: PointF): BarThumb? {
+        return thumbs
+            .filter { it.pointerID == INVALID_POINTER_ID }
+            .minByOrNull { dist2(it.centerPoint, point) }
+    }
+
+    fun addThumb(thumbColor: Int, colorPosition: Int) {
+        val thumb = BarThumb(thumbColor)
+        thumbs.add(thumb)
+        setThumbColor(thumbs.lastIndex, colorPosition)
+        invalidate()
+    }
+
+    fun removeThumb() {
+        if (thumbs.isNotEmpty()) {
+            thumbs.removeLast()
+            invalidate()
+        }
+    }
+
+    private fun handleTouch(thumb: BarThumb): Boolean {
+        val (x, y) = (thumb.touchPoint.x - centerPoint.x) to (thumb.touchPoint.y - centerPoint.y)
+        val phi = atan2(-y, x)
+
+        var progress = phi / (2 * PI)
+        progress = if (progress < 0) (1 + progress) else (progress)
+        thumb.angleProgress = progress.toFloat()
+        thumb.radiusProgress = min(1f, hypot(x, y) / circleRadius)  // Set to 1.0 to lock onto edge
+        thumb.updatePosition(centerPoint, circleRadius)
+
+        onValueChanged(thumbs.mapIndexed { i, _ -> getThumbColor(i) })
+
+        // TODO invalidate drawable
+        invalidate()
+        return true
+    }
+
+    fun getThumbColor(i: Int): Int = thumbs[i].let { hueColor(it.angleProgress, it.radiusProgress) }
+    fun setThumbColor(i: Int, color: Int) {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        thumbs[i].angleProgress = hsv[0] / 360f
+        thumbs[i].radiusProgress = hsv[1]
+        invalidate()
+    }
+
+    fun setProfileType(type: ProfileType) {
+        if (type != profileType) {
+            this.profileType = type
+            invalidate()
+        }
+    }
+
+    override fun onSaveInstanceState(): Parcelable {
+        val state = SavedState(super.onSaveInstanceState())
+        state.thumbAngles = FloatArray(thumbs.size, { i -> thumbs[i].angleProgress })
+        state.thumbRadii = FloatArray(thumbs.size, { i -> thumbs[i].radiusProgress })
+        return state
+    }
+
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        if (state !is SavedState) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+
+        super.onRestoreInstanceState(state.superState)
+
+        state.thumbAngles.forEachIndexed { i, v -> thumbs[i].angleProgress = v }
+        state.thumbRadii.forEachIndexed { i, v -> thumbs[i].radiusProgress = v }
+        onValueChanged(thumbs.mapIndexed { i, _ -> getThumbColor(i) })
+        invalidate()
+    }
+
+    class SavedState : BaseSavedState {
+        var thumbAngles: FloatArray = FloatArray(0)
+        var thumbRadii: FloatArray = FloatArray(0)
+
+        constructor(superState: Parcelable?) : super(superState)
+
+        constructor(source: Parcel) : super(source) {
+            source.readFloatArray(thumbRadii)
+            source.readFloatArray(thumbAngles)
+        }
+
+        override fun writeToParcel(out: Parcel, flags: Int) {
+            super.writeToParcel(out, flags)
+            out.writeFloatArray(thumbAngles)
+            out.writeFloatArray(thumbRadii)
         }
 
         companion object {
