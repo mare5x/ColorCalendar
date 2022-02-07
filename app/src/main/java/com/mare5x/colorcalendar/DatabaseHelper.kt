@@ -61,8 +61,8 @@ object DatabaseContract {
 
 
 enum class ProfileType(val value: Int) {
-    TWO_COLOR_CIRCLE_SHORT(0),  // 0 must be default for old database compatibility
-    TWO_COLOR_CIRCLE_LONG(1),
+    CIRCLE_SHORT(0),  // 0 must be default for old database compatibility
+    CIRCLE_LONG(1),
     ONE_COLOR_SHADE(2),
     FREE_COLOR(3),
     BOOLEAN_COLOR(4);
@@ -79,7 +79,7 @@ data class ProfileEntry(
     var maxColor: Int = 0,
     var prefColor: Int = 0,
     var creationDate: Date = Date(),
-    var type: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+    var type: ProfileType = ProfileType.CIRCLE_SHORT
 )
 
 data class Entry(

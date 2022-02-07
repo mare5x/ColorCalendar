@@ -12,9 +12,8 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SwitchCompat
 import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.Fragment
+import com.mare5x.colorcalendar.databinding.ActivityProfileEditorBinding
 import java.text.DateFormat
 import java.util.*
 
@@ -139,26 +138,24 @@ class DatePickerFragment : DialogFragment() {
 
 
 class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener {
+    private lateinit var binding: ActivityProfileEditorBinding
     private lateinit var circleBar: ColorCircleBar
-    private lateinit var profileText: EditText
     private lateinit var colorBar: ColorSeekBar2
-    private lateinit var dateButton: Button
-    private lateinit var circleSwitch: SwitchCompat
 
     private var profileId: Long = -1L  // Used when editing profile.
     private var profileCreationDate: Long = -1L
-    private var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
         set(value) {
             field = value
             circleBar.setProfileType(value)
             colorBar.profileType = value
             when (value) {
-                ProfileType.TWO_COLOR_CIRCLE_SHORT -> circleSwitch.isChecked = false
-                ProfileType.TWO_COLOR_CIRCLE_LONG -> circleSwitch.isChecked = true
+                ProfileType.CIRCLE_SHORT -> binding.circleSwitch.isChecked = false
+                ProfileType.CIRCLE_LONG -> binding.circleSwitch.isChecked = true
             }
             setUIColor(colorBar.getColor())
         }
-    private var forceSelection = false
+    private var forceSelection = false  // For first profile
 
     private var year: Int = 0
     private var month: Int = 0
@@ -166,9 +163,9 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        setContentView(R.layout.activity_profile_editor)
-        setSupportActionBar(findViewById(R.id.toolbar))
+        binding = ActivityProfileEditorBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        setSupportActionBar(binding.toolbar)
 
         forceSelection = intent.getBooleanExtra(FORCE_SELECTION_KEY, false)
 
@@ -180,9 +177,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         }
 
         circleBar = findViewById(R.id.colorCircleBar)
-        profileText = findViewById(R.id.profileNameEdit)
         colorBar = findViewById(R.id.colorSeekBar)
-        circleSwitch = findViewById(R.id.circleSwitch)
         circleBar.onValueChanged = { _, _ ->
             colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
             setUIColor(colorBar.getColor())
@@ -190,15 +185,20 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         colorBar.onValueChanged = { _, prefColor ->
             setUIColor(prefColor)
         }
-        dateButton = findViewById(R.id.dateButton)
-        dateButton.setOnClickListener {
+        binding.dateButton.setOnClickListener {
             DatePickerFragment.create(year, month, dayOfMonth).show(supportFragmentManager, "datePicker")
         }
-        circleSwitch.setOnCheckedChangeListener { _, isChecked ->
+        binding.circleSwitch.setOnCheckedChangeListener { _, isChecked ->
             profileType = when (isChecked) {
-                false -> ProfileType.TWO_COLOR_CIRCLE_SHORT
-                true -> ProfileType.TWO_COLOR_CIRCLE_LONG
+                false -> ProfileType.CIRCLE_SHORT
+                true -> ProfileType.CIRCLE_LONG
             }
+        }
+        binding.barRadioButton.setOnClickListener {
+            binding.freeRadioButton.isChecked = false
+        }
+        binding.freeRadioButton.setOnClickListener {
+            binding.barRadioButton.isChecked = false
         }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
@@ -222,7 +222,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
 
         intent.getStringExtra(PROFILE_NAME_KEY).let { name ->
             if (name != null) {
-                profileText.setText(name)
+                binding.profileNameEdit.setText(name)
             }
         }
         intent.getIntExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0()).let { color ->
@@ -237,7 +237,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
 
         intent.getIntExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor()).let { color ->
             colorBar.setNormProgress(
-                calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), color))
+                calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), color, profileType))
         }
 
         setUIColor(colorBar.getColor())
@@ -291,7 +291,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
 
         val intent = Intent().apply {
             putExtra(PROFILE_ID_KEY, profileId)
-            putExtra(PROFILE_NAME_KEY, profileText.text.toString())
+            putExtra(PROFILE_NAME_KEY, binding.profileNameEdit.text.toString())
             putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0())
             putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1())
             putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
@@ -320,7 +320,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             set(Calendar.MONTH, month)
             set(Calendar.DAY_OF_MONTH, dayOfMonth)
         }.timeInMillis
-        dateButton.text = DateFormat.getDateInstance().format(Date(profileCreationDate))
+        binding.dateButton.text = DateFormat.getDateInstance().format(Date(profileCreationDate))
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

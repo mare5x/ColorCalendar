@@ -44,11 +44,10 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
         android:layout_marginTop="8dp"
         android:layout_marginEnd="8dp"
-        android:layout_marginRight="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/colorSeekBar"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/profileColorText"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/profileNameEdit" />
@@ -56,18 +55,13 @@
     <com.mare5x.colorcalendar.ColorSeekBar2
         android:id="@+id/colorSeekBar"
         android:layout_width="0dp"
-        android:layout_height="24dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginRight="8dp"
-        android:layout_marginBottom="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_height="25dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintBottom_toBottomOf="@+id/barRadioButton"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/colorCircleBar"
-        app:layout_constraintWidth_percent="0.8" />
+        app:layout_constraintStart_toEndOf="@+id/barRadioButton"
+        app:layout_constraintTop_toTopOf="@+id/barRadioButton" />
 
     <Button
         android:id="@+id/dateButton"
@@ -90,5 +84,51 @@
         android:minHeight="48dp"
         app:layout_constraintEnd_toEndOf="@+id/colorCircleBar"
         app:layout_constraintTop_toTopOf="@+id/colorCircleBar" />
+
+    <TextView
+        android:id="@+id/profileColorText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="Profile color:"
+        android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+        android:textSize="16sp"
+        app:layout_constraintBottom_toTopOf="@+id/barRadioButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/colorCircleBar" />
+
+    <com.mare5x.colorcalendar.ColorRectButton
+        android:id="@+id/profileColorButton"
+        android:layout_width="@dimen/color_item_size"
+        android:layout_height="@dimen/color_item_size"
+        android:layout_margin="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toEndOf="@+id/freeRadioButton"
+        app:layout_constraintTop_toBottomOf="@+id/barRadioButton" />
+
+    <RadioButton
+        android:id="@+id/barRadioButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        app:layout_constraintStart_toStartOf="@+id/freeRadioButton"
+        app:layout_constraintTop_toBottomOf="@+id/profileColorText" />
+
+    <RadioButton
+        android:id="@+id/freeRadioButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:text="Pick color"
+        app:layout_constraintBottom_toBottomOf="@+id/profileColorButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/profileColorButton" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

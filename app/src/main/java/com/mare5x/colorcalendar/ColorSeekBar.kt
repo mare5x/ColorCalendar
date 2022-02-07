@@ -25,10 +25,38 @@ import kotlin.math.*
 // TODO pick a shade of a single color
 
 
-// Shortest distance between angles alpha and beta.
-fun circleDistance(alpha: Float, beta: Float) : Float {
-    val d = abs(beta - alpha) % 360f
-    return if (d > 180f) (360 - d) else d
+fun circleDistance(alpha: Float, beta: Float, type: ProfileType) : Float {
+    val d = abs(beta - alpha).mod(360f)
+    return when (type) {
+        ProfileType.CIRCLE_SHORT -> min(d, 360f - d)
+        ProfileType.CIRCLE_LONG -> max(d, 360f - d)
+        else -> TODO()
+    }
+}
+
+fun correctDistanceAngles(alpha: Float, beta: Float, type: ProfileType) : Pair<Float, Float> {
+    var a = alpha
+    var b = beta
+    when (type) {
+        ProfileType.CIRCLE_SHORT ->
+            if (abs(b - a) > 180) {
+                if (alpha in 0f..180f) {
+                    b -= 360f
+                } else {
+                    a -= 360f
+                }
+            }
+        ProfileType.CIRCLE_LONG ->
+            if (abs(b - a) < 180) {
+                if (a < b) {
+                    b -= 360f
+                } else {
+                    a -= 360f
+                }
+            }
+        else -> TODO()
+    }
+    return Pair(a, b)
 }
 
 fun complementaryColor(color: Int) : Int {
@@ -45,7 +73,7 @@ fun dimColor(color: Int, dim: Float) : Int {
     return Color.HSVToColor(hsv)
 }
 
-fun calcGradientColor(startColor: Int, endColor: Int, t: Float, type: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT) : Int {
+fun calcGradientColor(startColor: Int, endColor: Int, t: Float, type: ProfileType = ProfileType.CIRCLE_SHORT) : Int {
     val hsv1 = floatArrayOf(0f, 0f, 0f)
     Color.RGBToHSV(startColor.red, startColor.green, startColor.blue, hsv1)
     val hsv2 = floatArrayOf(0f, 0f, 0f)
@@ -53,7 +81,7 @@ fun calcGradientColor(startColor: Int, endColor: Int, t: Float, type: ProfileTyp
 
     // TODO try gamma 2.2 space?
     // Hue value is in [0, 360].
-    if (type == ProfileType.TWO_COLOR_CIRCLE_SHORT) {
+    if (type == ProfileType.CIRCLE_SHORT) {
         // The interpolation must take the shortest route -> modulo ...
         if (abs(hsv2[0] - hsv1[0]) > 180) {
             if (hsv1[0] in 0f..180f) {
@@ -79,14 +107,22 @@ fun calcGradientColor(startColor: Int, endColor: Int, t: Float, type: ProfileTyp
     return Color.HSVToColor(hsv)
 }
 
-fun calcGradientProgress(startColor: Int, endColor: Int, midColor: Int) : Float {
+fun calcGradientProgress(startColor: Int, endColor: Int, midColor: Int, type: ProfileType) : Float {
     val hsvStart = FloatArray(3)
     val hsvEnd = FloatArray(3)
     val hsvMid = FloatArray(3)
     Color.colorToHSV(startColor, hsvStart)
     Color.colorToHSV(endColor, hsvEnd)
     Color.colorToHSV(midColor, hsvMid)
-    return circleDistance(hsvStart[0], hsvMid[0]) / circleDistance(hsvStart[0], hsvEnd[0])
+
+    // TODO check correctness? Consider profile type!
+    val (a, b) = correctDistanceAngles(hsvStart[0], hsvEnd[0], type)
+    if (hsvMid[0] in a..b || hsvMid[0] in b..a) {
+        return abs(hsvMid[0] - a) / abs(b - a)
+    } else {
+        return abs(hsvMid[0] - 360f - a) / abs(b - a)
+    }
+    // return circleDistance(hsvStart[0], hsvMid[0], type) / circleDistance(hsvStart[0], hsvEnd[0], type)
 }
 
 fun hueColor(t: Float) = Color.HSVToColor(floatArrayOf(t * 360f, 1.0f, 1.0f))
@@ -134,7 +170,7 @@ open class ColorSeekBar : AppCompatSeekBar {
     protected var endColor: Int = Color.GRAY
     protected var fullHue: Boolean = false
 
-    var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+    var profileType: ProfileType = ProfileType.CIRCLE_SHORT
         set(value) {
             if (field != value) {
                 field = value
@@ -199,7 +235,7 @@ open class ColorSeekBar : AppCompatSeekBar {
             return hueColor(getNormProgress())
         }
         return when (profileType) {
-            ProfileType.TWO_COLOR_CIRCLE_SHORT, ProfileType.TWO_COLOR_CIRCLE_LONG -> calcGradientColor(startColor, endColor, getNormProgress(), profileType)
+            ProfileType.CIRCLE_SHORT, ProfileType.CIRCLE_LONG -> calcGradientColor(startColor, endColor, getNormProgress(), profileType)
             else -> TODO()
         }
     }
@@ -256,7 +292,7 @@ val HUE_COLORS = intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Co
 class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
                             private var endColor: Int = Color.GRAY,
                             private var fullHue: Boolean = false,
-                            private var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+                            private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
 ) : PaintDrawable() {
 
     init {
@@ -291,7 +327,7 @@ class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
         val r0 = alpha % h
         val k0: Int = (6 * (alpha - r0)).toInt()
 
-        if (profileType == ProfileType.TWO_COLOR_CIRCLE_SHORT) {
+        if (profileType == ProfileType.CIRCLE_SHORT) {
             if (abs(beta - alpha) > 0.5f) {
                 if (alpha <= 0.5f) {
                     beta -= 1.0f
@@ -405,7 +441,7 @@ class ColorCircleBar : View {
 
     var onValueChanged: (value0: Float, value1: Float) -> Unit = { _, _ ->  }
 
-    private var profileType: ProfileType = ProfileType.TWO_COLOR_CIRCLE_SHORT
+    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
 
     private var circleRadius: Float = 0f  // px units
     private val centerPoint: PointF = PointF()  // local px units
@@ -443,7 +479,7 @@ class ColorCircleBar : View {
         }
         var thumb0Angle = (1 - thumb0.progress) * 360f
         var thumb1Angle = (1 - thumb1.progress) * 360f
-        if (profileType == ProfileType.TWO_COLOR_CIRCLE_SHORT) {
+        if (profileType == ProfileType.CIRCLE_SHORT) {
             if (abs(thumb1Angle - thumb0Angle) > 180f) {
                 if (thumb0Angle <= 180f) {
                     thumb1Angle -= 360f

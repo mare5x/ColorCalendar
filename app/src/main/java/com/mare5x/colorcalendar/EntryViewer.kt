@@ -346,7 +346,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
             fragment.arguments = Bundle().apply {
                 putInt(LOW_COLOR_KEY, profile.minColor)
                 putInt(HIGH_COLOR_KEY, profile.maxColor)
-                putFloat(BAR_VALUE_KEY, barValue ?: calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor))
+                putFloat(BAR_VALUE_KEY, barValue ?: calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.type))
                 putSerializable(PROFILE_TYPE, profile.type)
             }
             return fragment
