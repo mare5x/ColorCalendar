@@ -5,6 +5,7 @@ import android.app.DatePickerDialog
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
@@ -144,6 +145,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
 
     private var profileId: Long = -1L  // Used when editing profile.
     private var profileCreationDate: Long = -1L
+    private var prefColor: Int = Color.GRAY
     private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
         set(value) {
             field = value
@@ -152,8 +154,26 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             when (value) {
                 ProfileType.CIRCLE_SHORT -> binding.circleSwitch.isChecked = false
                 ProfileType.CIRCLE_LONG -> binding.circleSwitch.isChecked = true
+                else -> TODO()
             }
-            setUIColor(colorBar.getColor())
+            updateUIColor()
+        }
+    private var profileFlags: Int = 0
+        set(value) {
+            field = value
+            when {
+                value hasFlag ProfileFlag.FREE_PREF_COLOR -> {
+                    binding.barRadioButton.isChecked = false
+                    binding.colorSeekBar.isEnabled = false
+                    binding.freeRadioButton.isChecked = true
+                }
+                value hasFlagNot ProfileFlag.FREE_PREF_COLOR -> {
+                    binding.barRadioButton.isChecked = true
+                    binding.colorSeekBar.isEnabled = true
+                    binding.freeRadioButton.isChecked = false
+                }
+            }
+            updateUIColor()
         }
     private var forceSelection = false  // For first profile
 
@@ -180,10 +200,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         colorBar = findViewById(R.id.colorSeekBar)
         circleBar.onValueChanged = { _, _ ->
             colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
-            setUIColor(colorBar.getColor())
+            updateUIColor()
         }
         colorBar.onValueChanged = { _, prefColor ->
-            setUIColor(prefColor)
+            updateUIColor()
         }
         binding.dateButton.setOnClickListener {
             DatePickerFragment.create(year, month, dayOfMonth).show(supportFragmentManager, "datePicker")
@@ -195,10 +215,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             }
         }
         binding.barRadioButton.setOnClickListener {
-            binding.freeRadioButton.isChecked = false
+            profileFlags = profileFlags.setFlag0(ProfileFlag.FREE_PREF_COLOR)
         }
         binding.freeRadioButton.setOnClickListener {
-            binding.barRadioButton.isChecked = false
+            profileFlags = profileFlags.setFlag1(ProfileFlag.FREE_PREF_COLOR)
         }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
@@ -236,11 +256,15 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
 
         intent.getIntExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor()).let { color ->
-            colorBar.setNormProgress(
-                calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), color, profileType))
+
+            colorBar.setNormProgress(calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), color, profileType))
         }
 
-        setUIColor(colorBar.getColor())
+        intent.getIntExtra(PROFILE_FLAGS_KEY, 0).let { flags ->
+            profileFlags = savedInstanceState?.getInt(PROFILE_FLAGS_KEY, flags) ?: flags
+        }
+
+        updateUIColor()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -297,8 +321,17 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor())
             putExtra(PROFILE_CREATION_DATE_KEY, profileCreationDate)
             putExtra(PROFILE_TYPE_KEY, profileType)
+            putExtra(PROFILE_FLAGS_KEY, profileFlags)
         }
         setResult(RESULT_OK, intent)
+    }
+
+    private fun updateUIColor() {
+        if (profileFlags hasFlag ProfileFlag.FREE_PREF_COLOR) {
+            setUIColor(prefColor)
+        } else {
+            setUIColor(colorBar.getColor())
+        }
     }
 
     private fun setUIColor(color: Int) {
@@ -332,6 +365,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             putInt(MONTH_KEY, month)
             putInt(DAY_KEY, dayOfMonth)
             putSerializable(PROFILE_TYPE_KEY, profileType)
+            putInt(PROFILE_FLAGS_KEY, profileFlags)
         }
     }
 
@@ -348,5 +382,6 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         const val PROFILE_PREF_COLOR_KEY = "profile_pref_color_key"
         const val PROFILE_CREATION_DATE_KEY = "profile_creation_date_key"
         const val PROFILE_TYPE_KEY = "profile_type_key"
+        const val PROFILE_FLAGS_KEY = "profile_flags_key"
     }
 }

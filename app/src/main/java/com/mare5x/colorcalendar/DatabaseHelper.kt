@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.provider.BaseColumns
 import android.util.Log
+import androidx.core.database.getIntOrNull
 import java.util.*
 
 
@@ -25,6 +26,7 @@ object DatabaseContract {
         const val PREF_COLOR = "pref_color"
         const val CREATION_DATE = "creation_date"
         const val PROFILE_TYPE = "profile_type"
+        const val PROFILE_FLAGS = "flags"
 
         const val DB_CREATE = """
             CREATE TABLE ${TABLE_NAME}(
@@ -34,7 +36,8 @@ object DatabaseContract {
                 $MAX_COLOR INTEGER NOT NULL,
                 $PREF_COLOR INTEGER NOT NULL,
                 $CREATION_DATE INTEGER NOT NULL,
-                $PROFILE_TYPE INTEGER NOT NULL
+                $PROFILE_TYPE INTEGER NOT NULL,
+                $PROFILE_FLAGS INTEGER 
             );
         """
     }
@@ -72,6 +75,15 @@ enum class ProfileType(val value: Int) {
     }
 }
 
+enum class ProfileFlag(val value: Int) {
+    FREE_PREF_COLOR(1 shl 0)
+}
+
+infix fun Int.hasFlag(flag: ProfileFlag): Boolean = this and flag.value > 0
+infix fun Int.hasFlagNot(flag: ProfileFlag) = !(this hasFlag flag)
+fun Int.setFlag0(flag: ProfileFlag): Int = this and flag.value.inv()
+fun Int.setFlag1(flag: ProfileFlag): Int = this or flag.value
+
 data class ProfileEntry(
     var id: Long = -1,
     var name: String = "null",
@@ -79,7 +91,8 @@ data class ProfileEntry(
     var maxColor: Int = 0,
     var prefColor: Int = 0,
     var creationDate: Date = Date(),
-    var type: ProfileType = ProfileType.CIRCLE_SHORT
+    var type: ProfileType = ProfileType.CIRCLE_SHORT,
+    var flags: Int = 0  // Extra flags, as Int because I don't know what I'll need ...
 )
 
 data class Entry(
@@ -120,6 +133,7 @@ fun readProfileEntry(cursor: Cursor) : ProfileEntry {
         profile.prefColor = getInt(getColumnIndexOrThrow(profileDB.PREF_COLOR))
         profile.creationDate = Date(getLong(getColumnIndexOrThrow(profileDB.CREATION_DATE)))
         profile.type = ProfileType.fromInt(getInt(getColumnIndexOrThrow(profileDB.PROFILE_TYPE)))
+        profile.flags = getIntOrNull(getColumnIndexOrThrow(profileDB.PROFILE_FLAGS)) ?: 0
     }
     return profile
 }
@@ -220,6 +234,10 @@ class DatabaseHelper : SQLiteOpenHelper {
                 ALTER TABLE ${profileDB.TABLE_NAME}
                 ADD COLUMN ${profileDB.PROFILE_TYPE} INTEGER NOT NULL DEFAULT 0
             """.trimIndent())
+            db.execSQL("""
+                ALTER TABLE ${profileDB.TABLE_NAME}
+                ADD COLUMN ${profileDB.PROFILE_FLAGS} INTEGER 
+            """.trimIndent())
         }
     }
 
@@ -232,6 +250,7 @@ class DatabaseHelper : SQLiteOpenHelper {
             put(profileDB.PREF_COLOR, profile.prefColor)
             put(profileDB.CREATION_DATE, profile.creationDate.time)
             put(profileDB.PROFILE_TYPE, profile.type.value)
+            put(profileDB.PROFILE_FLAGS, profile.flags)
         }
 
         try {
@@ -251,6 +270,7 @@ class DatabaseHelper : SQLiteOpenHelper {
             put(profileDB.PREF_COLOR, profile.prefColor)
             put(profileDB.CREATION_DATE, profile.creationDate.time)
             put(profileDB.PROFILE_TYPE, profile.type.value)
+            put(profileDB.PROFILE_FLAGS, profile.flags)
         }
         writableDatabase.update(profileDB.TABLE_NAME, values, "${profileDB.ID} = ${profile.id}", null)
         return profile.id
