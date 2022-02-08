@@ -24,6 +24,8 @@ import kotlin.math.*
 
 // TODO pick a shade of a single color
 
+fun square(x: Float) = x * x
+fun dist2(a: PointF, b: PointF): Float = square(b.x - a.x) + square(b.y - a.y)
 
 fun circleDistance(alpha: Float, beta: Float, type: ProfileType) : Float {
     val d = abs(beta - alpha).mod(360f)
@@ -68,6 +70,15 @@ fun complementaryColor(color: Int) : Int {
     return Color.HSVToColor(hsv)
 }
 
+// HSV Extension properties for Integers
+val Int.hue: Float
+    get() {
+        val hsv = floatArrayOf(0f, 0f, 0f)
+        Color.colorToHSV(this, hsv)
+        return hsv[0]
+    }
+
+
 fun dimColor(color: Int, dim: Float) : Int {
     val hsv = FloatArray(3)
     Color.colorToHSV(color, hsv)
@@ -96,6 +107,7 @@ fun calcGradientColor(startColor: Int, endColor: Int, t: Float, type: ProfileTyp
 }
 
 fun calcGradientProgress(startColor: Int, endColor: Int, midColor: Int, type: ProfileType) : Float {
+    // Assume startColor and endColor have the same Saturation and Value.
     val hsvStart = FloatArray(3)
     val hsvEnd = FloatArray(3)
     val hsvMid = FloatArray(3)
@@ -297,6 +309,7 @@ class ColorPickerBar : ConstraintLayout {
 }
 
 val HUE_COLORS = intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA)
+val HUES = HUE_COLORS.map { it.hue / 360f }  // [0,1] position of each basic color
 
 class HueGradientDrawable(private var startColor: Int = Color.GRAY,
                           private var endColor: Int = Color.GRAY,
@@ -325,6 +338,7 @@ class HueGradientDrawable(private var startColor: Int = Color.GRAY,
     }
 
     private fun createShader(startColor: Int, endColor: Int, width: Float): Shader {
+        // Assume startColor and endColor have the same Saturation and Value.
         val hsv0 = FloatArray(3)
         val hsv1 = FloatArray(3)
         Color.colorToHSV(startColor, hsv0)
@@ -351,7 +365,7 @@ class HueGradientDrawable(private var startColor: Int = Color.GRAY,
         colors[n] = startColor
         while (offsets[n] < 1f) {
             n += 1
-            colors[n] = HUE_COLORS[(k0 + n * dir + st).mod(6)]
+            colors[n] = hueColor(HUES[(k0 + n * dir + st).mod(6)], hsv0[1], hsv0[2])
             if (n == 1) {
                 offsets[n] = min(1f, (if (dir > 0) (h - r0) else r0) / delta)
             } else {
@@ -708,22 +722,20 @@ class ColorCircleBar : View {
 }
 
 
-class HSVCircleBar : View {
+open class HSVCircleBar : View {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
     var onValueChanged: (thumbs: List<BarThumb>) -> Unit = { _ ->  }
 
-    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
+    protected var circleRadius: Float = 0f  // px units
+    protected val centerPoint: PointF = PointF()  // local px units
 
-    private var circleRadius: Float = 0f  // px units
-    private val centerPoint: PointF = PointF()  // local px units
-
-    private val thumbs: MutableList<BarThumb> = mutableListOf()
+    protected val thumbs: MutableList<BarThumb> = mutableListOf()
 
     private val huePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val saturationPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val trackPaint = Paint().apply {
+    protected val trackPaint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
         color = Color.GRAY
@@ -734,35 +746,23 @@ class HSVCircleBar : View {
     private var thumbDetectionRadius: Float = 4f  // dp units
     private var thumbRadius: Float = 12f  // dp units
 
-    private var thumbArcEnabled = false
-    private var arcRect = RectF()
-
     init {
         addThumb(Color.RED, Color.RED)
-        // addThumb(Color.GREEN, Color.GREEN)
     }
 
-    private fun drawThumbArc(canvas: Canvas) {
-        arcRect.apply {
-            left = centerPoint.x - circleRadius
-            top = centerPoint.y - circleRadius
-            right = centerPoint.x + circleRadius
-            bottom = centerPoint.y + circleRadius
-        }
-        val a0 = (1 - thumbs[0].angleProgress) * 360f
-        val a1 = (1 - thumbs[1].angleProgress) * 360f
-        val (thumb0Angle, thumb1Angle) = correctDistanceAngles(a0, a1, profileType)
-        canvas.drawArc(arcRect, thumb0Angle, thumb1Angle - thumb0Angle, false, trackPaint)
+    fun drawCircle(canvas: Canvas) {
+        canvas.drawCircle(centerPoint.x, centerPoint.y, circleRadius, huePaint)
+        canvas.drawCircle(centerPoint.x, centerPoint.y, circleRadius, saturationPaint)
+    }
+
+    fun drawThumbs(canvas: Canvas) {
+        thumbs.forEach { thumb -> thumb.draw(canvas) }
     }
 
     override fun onDraw(canvas: Canvas?) {
         canvas?.let{
-            it.drawCircle(centerPoint.x, centerPoint.y, circleRadius, huePaint)
-            it.drawCircle(centerPoint.x, centerPoint.y, circleRadius, saturationPaint)
-            if (thumbArcEnabled) {
-                drawThumbArc(it)
-            }
-            thumbs.forEach { thumb -> thumb.draw(canvas) }
+            drawCircle(it)
+            drawThumbs(it)
         }
     }
 
@@ -874,7 +874,7 @@ class HSVCircleBar : View {
         }
     }
 
-    private fun handleTouch(thumb: BarThumb): Boolean {
+    open fun handleTouch(thumb: BarThumb): Boolean {
         val (x, y) = (thumb.touchPoint.x - centerPoint.x) to (thumb.touchPoint.y - centerPoint.y)
         val phi = atan2(-y, x)
 
@@ -898,13 +898,6 @@ class HSVCircleBar : View {
         thumbs[i].angleProgress = hsv[0] / 360f
         thumbs[i].radiusProgress = hsv[1]
         invalidate()
-    }
-
-    fun setProfileType(type: ProfileType) {
-        if (type != profileType) {
-            this.profileType = type
-            invalidate()
-        }
     }
 
     override fun onSaveInstanceState(): Parcelable {
@@ -960,5 +953,66 @@ class HSVCircleBar : View {
     }
 }
 
-fun square(x: Float) = x * x
-fun dist2(a: PointF, b: PointF): Float = square(b.x - a.x) + square(b.y - a.y)
+class HSVTwoColorBar : HSVCircleBar {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
+    private var arcRect = RectF()
+
+    init {
+        addThumb(Color.GREEN, Color.GREEN)
+    }
+
+    fun setProfileType(type: ProfileType) {
+        if (type != profileType) {
+            this.profileType = type
+            invalidate()
+        }
+    }
+
+    override fun handleTouch(thumb: BarThumb): Boolean {
+        val (x, y) = (thumb.touchPoint.x - centerPoint.x) to (thumb.touchPoint.y - centerPoint.y)
+        val phi = atan2(-y, x)
+
+        var progress = phi / (2 * PI)
+        progress = if (progress < 0) (1 + progress) else (progress)
+        thumb.angleProgress = progress.toFloat()
+        thumb.radiusProgress = min(1f, hypot(x, y) / circleRadius)  // Set to 1.0 to lock onto edge
+        thumb.updatePosition(centerPoint, circleRadius)
+
+        thumbs.forEach {
+            it.radiusProgress = thumb.radiusProgress
+            it.updatePosition(centerPoint, circleRadius)
+        }
+
+        onValueChanged(thumbs)
+
+        // TODO invalidate drawable
+        invalidate()
+        return true
+    }
+
+    fun drawThumbArc(canvas: Canvas) {
+        // Both thumbs must always have the same radius!
+        val r = thumbs.first().radiusProgress * circleRadius
+        arcRect.apply {
+            left = centerPoint.x - r
+            top = centerPoint.y - r
+            right = centerPoint.x + r
+            bottom = centerPoint.y + r
+        }
+        val a0 = (1 - thumbs[0].angleProgress) * 360f
+        val a1 = (1 - thumbs[1].angleProgress) * 360f
+        val (thumb0Angle, thumb1Angle) = correctDistanceAngles(a0, a1, profileType)
+        canvas.drawArc(arcRect, thumb0Angle, thumb1Angle - thumb0Angle, false, trackPaint)
+    }
+
+    override fun onDraw(canvas: Canvas?) {
+        canvas?.let {
+            drawCircle(it)
+            drawThumbArc(it)
+            drawThumbs(it)
+        }
+    }
+}

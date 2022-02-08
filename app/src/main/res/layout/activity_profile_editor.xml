@@ -39,7 +39,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/dateButton" />
 
-    <com.mare5x.colorcalendar.ColorCircleBar
+    <com.mare5x.colorcalendar.HSVTwoColorBar
         android:id="@+id/colorCircleBar"
         android:layout_width="0dp"
         android:layout_height="0dp"

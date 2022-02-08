@@ -232,7 +232,7 @@ class ColorPickerFragment : DialogFragment() {
 
 class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerFragment.ColorPickerListener {
     private lateinit var binding: ActivityProfileEditorBinding
-    private lateinit var circleBar: ColorCircleBar
+    private lateinit var circleBar: HSVTwoColorBar
     private lateinit var colorBar: ColorSeekBar2
 
     private var profileId: Long = -1L  // Used when editing profile.
@@ -288,10 +288,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             actionBar.setDisplayShowHomeEnabled(!forceSelection)
         }
 
-        circleBar = findViewById(R.id.colorCircleBar)
-        colorBar = findViewById(R.id.colorSeekBar)
-        circleBar.onValueChanged = { _, _ ->
-            colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
+        circleBar = binding.colorCircleBar
+        colorBar = binding.colorSeekBar
+        circleBar.onValueChanged = { _ ->
+            colorBar.setColors(circleBar.getThumbColor(0), circleBar.getThumbColor(1))
             updateUIColor()
         }
         colorBar.onValueChanged = { _, _ ->
@@ -341,15 +341,15 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
                 binding.profileNameEdit.setText(name)
             }
         }
-        intent.getIntExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0()).let { color ->
-            circleBar.setColor0(color)
+        intent.getIntExtra(PROFILE_MIN_COLOR_KEY, circleBar.getThumbColor(0)).let { color ->
+            circleBar.setThumbColor(0, color)
         }
-        intent.getIntExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1()).let { color ->
-            circleBar.setColor1(color)
+        intent.getIntExtra(PROFILE_MAX_COLOR_KEY, circleBar.getThumbColor(1)).let { color ->
+            circleBar.setThumbColor(1, color)
         }
 
         colorBar.setNormProgress(0.8f)
-        colorBar.setColors(circleBar.getColor0(), circleBar.getColor1())
+        colorBar.setColors(circleBar.getThumbColor(0), circleBar.getThumbColor(1))
 
         intent.getIntExtra(PROFILE_FLAGS_KEY, 0).let { flags ->
             profileFlags = savedInstanceState?.getInt(PROFILE_FLAGS_KEY, flags) ?: flags
@@ -360,7 +360,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
             prefColor = c
             binding.profileColorButton.color = c
             if (profileFlags hasFlagNot ProfileFlag.FREE_PREF_COLOR) {
-                colorBar.setNormProgress(calcGradientProgress(circleBar.getColor0(), circleBar.getColor1(), c, profileType))
+                colorBar.setNormProgress(calcGradientProgress(circleBar.getThumbColor(0), circleBar.getThumbColor(1), c, profileType))
             }
         }
 
@@ -416,8 +416,8 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         val intent = Intent().apply {
             putExtra(PROFILE_ID_KEY, profileId)
             putExtra(PROFILE_NAME_KEY, binding.profileNameEdit.text.toString())
-            putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getColor0())
-            putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getColor1())
+            putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getThumbColor(0))
+            putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getThumbColor(1))
             putExtra(PROFILE_PREF_COLOR_KEY,
                 if (profileFlags hasFlag ProfileFlag.FREE_PREF_COLOR) prefColor
                 else colorBar.getColor())
