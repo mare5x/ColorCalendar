@@ -149,6 +149,8 @@ class ColorPickerFragment : DialogFragment() {
     private var _binding: DialogColorPickerBinding? = null
     private val binding get() = _binding!!
 
+    private val hsv = floatArrayOf(0f, 1f, 1f)
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -161,10 +163,24 @@ class ColorPickerFragment : DialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.colorRect.setColor(binding.colorPickerCircle.getThumbColor(0))
+        requireArguments().let {
+            Color.colorToHSV(it.getInt(COLOR_KEY), hsv)
+        }
 
+        binding.colorPickerCircle.setThumbColor(0, Color.HSVToColor(hsv))
         binding.colorPickerCircle.onValueChanged = { thumbs ->
-            binding.colorRect.setColor(thumbs.first())
+            thumbs.first().let {
+                hsv[0] = it.angleProgress * 360f
+                hsv[1] = it.radiusProgress
+            }
+            updateBarColors()
+        }
+
+        // Modify 'value' part of HSV
+        binding.colorPickerBar.setIsLinear(true)
+        binding.colorPickerBar.setNormProgress(hsv[2])
+        binding.colorPickerBar.onValueChanged = { value, _ ->
+            hsv[2] = value
         }
 
         binding.cancelButton.setOnClickListener {
@@ -173,10 +189,21 @@ class ColorPickerFragment : DialogFragment() {
                 dismiss()
         }
         binding.confirmButton.setOnClickListener {
-            listener.onColorConfirm(binding.colorPickerCircle.getThumbColor(0))
+            listener.onColorConfirm(Color.HSVToColor(hsv))
             if (showsDialog)
                 dismiss()
         }
+
+        updateBarColors()
+    }
+
+    private fun updateBarColors() {
+        // NOTE: This doesn't work! It just becomes Color.BLACK!
+        // val blackHSV = Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], 0f))
+        // HSV mixing would then interpolate both Hue and Sat instead of just value.
+        // However, changing just the Value is equivalent to RGB mixing between Black and the full HSV color.
+        // This is done using mixColors()
+        binding.colorPickerBar.setColors(Color.BLACK, binding.colorPickerCircle.getThumbColor(0))
     }
 
     override fun onDestroyView() {
@@ -187,6 +214,18 @@ class ColorPickerFragment : DialogFragment() {
     override fun onAttach(context: Context) {
         super.onAttach(context)
         listener = context as ColorPickerListener
+    }
+
+    companion object {
+        private const val COLOR_KEY = "color_key"
+
+        fun create(color: Int): ColorPickerFragment {
+            val fragment = ColorPickerFragment()
+            fragment.arguments = Bundle().apply {
+                putInt(COLOR_KEY, color)
+            }
+            return fragment
+        }
     }
 }
 
@@ -275,7 +314,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         }
 
         binding.profileColorButton.setOnClickListener {
-            ColorPickerFragment().show(supportFragmentManager, "colorPicker")
+            ColorPickerFragment.create(prefColor).show(supportFragmentManager, "colorPicker")
         }
 
         profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)

@@ -37,6 +37,8 @@ fun circleDistance(alpha: Float, beta: Float, type: ProfileType) : Float {
 fun correctDistanceAngles(alpha: Float, beta: Float, type: ProfileType) : Pair<Float, Float> {
     var a = alpha
     var b = beta
+    // TODO try gamma 2.2 space?
+    // NOTE: Hue value is in [0, 360].
     when (type) {
         ProfileType.CIRCLE_SHORT ->
             if (abs(b - a) > 180) {
@@ -73,34 +75,20 @@ fun dimColor(color: Int, dim: Float) : Int {
     return Color.HSVToColor(hsv)
 }
 
+fun mixColors(c0: Int, c1: Int, t: Float): Int {
+    val r = (1 - t) * c0.red + t * c1.red
+    val g = (1 - t) * c0.green + t * c1.green
+    val b = (1 - t) * c0.blue + t * c1.blue
+    return Color.rgb(r.roundToInt(), g.roundToInt(), b.roundToInt())
+}
+
 fun calcGradientColor(startColor: Int, endColor: Int, t: Float, type: ProfileType = ProfileType.CIRCLE_SHORT) : Int {
     val hsv1 = floatArrayOf(0f, 0f, 0f)
-    Color.RGBToHSV(startColor.red, startColor.green, startColor.blue, hsv1)
     val hsv2 = floatArrayOf(0f, 0f, 0f)
+    Color.RGBToHSV(startColor.red, startColor.green, startColor.blue, hsv1)
     Color.RGBToHSV(endColor.red, endColor.green, endColor.blue, hsv2)
-
-    // TODO try gamma 2.2 space?
-    // Hue value is in [0, 360].
-    if (type == ProfileType.CIRCLE_SHORT) {
-        // The interpolation must take the shortest route -> modulo ...
-        if (abs(hsv2[0] - hsv1[0]) > 180) {
-            if (hsv1[0] in 0f..180f) {
-                hsv2[0] -= 360f
-            } else {
-                hsv1[0] -= 360f
-            }
-        }
-    } else {
-        // Take the long route
-        if (abs(hsv2[0] - hsv1[0]) < 180) {
-            if (hsv1[0] < hsv2[0]) {
-                hsv2[0] -= 360f
-            } else {
-                hsv1[0] -= 360f
-            }
-        }
-    }
-    val h = ((1.0f - t) * hsv1[0] + t * hsv2[0] + 720f).rem(360f)  // Work-around for negative modulo ...
+    val (h0, h1) = correctDistanceAngles(hsv1[0], hsv2[0], type)
+    val h = ((1.0f - t) * h0 + t * h1).mod(360f)
     val s = (1.0f - t) * hsv1[1] + t * hsv2[1]
     val v = (1.0f - t) * hsv1[2] + t * hsv2[2]
     val hsv = floatArrayOf(h, s, v)
@@ -145,12 +133,21 @@ class ColorSeekBar2 : ColorSeekBar {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
+    var isLinear = false
+        set(value) {
+            field = value
+            updateGradientBackground()
+        }
+
     init {
         updateGradientBackground()
     }
 
     override fun updateGradientBackground() {
-        val bg = ColorGradientDrawable(startColor, endColor, fullHue, profileType)
+        val bg = when {
+            isLinear -> LinearColorDrawable(startColor, endColor)
+            else -> HueGradientDrawable(startColor, endColor, fullHue, profileType)
+        }
 
         // TODO this
         // progressDrawable = grad
@@ -158,6 +155,13 @@ class ColorSeekBar2 : ColorSeekBar {
             background = bg
         } else {
             setBackgroundDrawable(bg)
+        }
+    }
+
+    override fun getColor(): Int {
+        return when {
+            isLinear -> mixColors(startColor, endColor, getNormProgress())
+            else -> super.getColor()
         }
     }
 }
@@ -230,7 +234,7 @@ open class ColorSeekBar : AppCompatSeekBar {
         progress = (t * max).toInt()
     }
 
-    fun getColor(): Int {
+    open fun getColor(): Int {
         if (fullHue) {
             return hueColor(getNormProgress())
         }
@@ -285,14 +289,19 @@ class ColorPickerBar : ConstraintLayout {
         colorBar.profileType = type
         updateColorRect()
     }
+
+    fun setIsLinear(value: Boolean) {
+        colorBar.isLinear = value
+        updateColorRect()
+    }
 }
 
 val HUE_COLORS = intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA)
 
-class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
-                            private var endColor: Int = Color.GRAY,
-                            private var fullHue: Boolean = false,
-                            private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
+class HueGradientDrawable(private var startColor: Int = Color.GRAY,
+                          private var endColor: Int = Color.GRAY,
+                          private var fullHue: Boolean = false,
+                          private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
 ) : PaintDrawable() {
 
     init {
@@ -321,29 +330,15 @@ class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
         Color.colorToHSV(startColor, hsv0)
         Color.colorToHSV(endColor, hsv1)
         var alpha = hsv0[0] / 360f
-        var beta = hsv1[0] / 360f
+        var beta: Float
         val h = 1.0f / 6.0f
         // alpha == k0 / 6 + r0
         val r0 = alpha % h
         val k0: Int = (6 * (alpha - r0)).toInt()
 
-        if (profileType == ProfileType.CIRCLE_SHORT) {
-            if (abs(beta - alpha) > 0.5f) {
-                if (alpha <= 0.5f) {
-                    beta -= 1.0f
-                } else {
-                    alpha -= 1.0f
-                }
-            }
-        } else {
-            // Long route
-            if (abs(beta - alpha) < 0.5f) {
-                if (alpha < beta) {
-                    beta -= 1.0f
-                } else {
-                    alpha -= 1.0f
-                }
-            }
+        correctDistanceAngles(hsv0[0], hsv1[0], profileType).let {
+            alpha = it.first / 360f
+            beta = it.second / 360f
         }
 
         val delta = abs(beta - alpha)
@@ -371,6 +366,19 @@ class ColorGradientDrawable(private var startColor: Int = Color.GRAY,
         return LinearGradient(0f, 0f, width, 0f, colors, offsets, Shader.TileMode.CLAMP)
     }
 }
+
+class LinearColorDrawable(private val startColor: Int,
+                          private val endColor: Int) : PaintDrawable() {
+    init {
+        paint.isAntiAlias = true
+    }
+
+    override fun draw(canvas: Canvas) {
+        paint.shader = LinearGradient(0f, 0f, bounds.width().toFloat(), 0f, startColor, endColor, Shader.TileMode.CLAMP)
+        super.draw(canvas)
+    }
+}
+
 
 class ThumbDrawable(accentColor: Int) : Drawable() {
     private val outerPaint = Paint().apply {
@@ -437,6 +445,7 @@ class BarThumb(color: Int) {
     }
 }
 
+// TODO change to HSVCircleBar
 class ColorCircleBar : View {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
@@ -703,7 +712,7 @@ class HSVCircleBar : View {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-    var onValueChanged: (thumbs: List<Int>) -> Unit = { _ ->  }
+    var onValueChanged: (thumbs: List<BarThumb>) -> Unit = { _ ->  }
 
     private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
 
@@ -740,25 +749,9 @@ class HSVCircleBar : View {
             right = centerPoint.x + circleRadius
             bottom = centerPoint.y + circleRadius
         }
-        var thumb0Angle = (1 - thumbs[0].angleProgress) * 360f
-        var thumb1Angle = (1 - thumbs[1].angleProgress) * 360f
-        if (profileType == ProfileType.CIRCLE_SHORT) {
-            if (abs(thumb1Angle - thumb0Angle) > 180f) {
-                if (thumb0Angle <= 180f) {
-                    thumb1Angle -= 360f
-                } else {
-                    thumb0Angle -= 360f
-                }
-            }
-        } else {
-            if (abs(thumb1Angle - thumb0Angle) < 180f) {
-                if (thumb0Angle < thumb1Angle) {
-                    thumb1Angle -= 360f
-                } else {
-                    thumb0Angle -= 360f
-                }
-            }
-        }
+        val a0 = (1 - thumbs[0].angleProgress) * 360f
+        val a1 = (1 - thumbs[1].angleProgress) * 360f
+        val (thumb0Angle, thumb1Angle) = correctDistanceAngles(a0, a1, profileType)
         canvas.drawArc(arcRect, thumb0Angle, thumb1Angle - thumb0Angle, false, trackPaint)
     }
 
@@ -891,7 +884,7 @@ class HSVCircleBar : View {
         thumb.radiusProgress = min(1f, hypot(x, y) / circleRadius)  // Set to 1.0 to lock onto edge
         thumb.updatePosition(centerPoint, circleRadius)
 
-        onValueChanged(thumbs.mapIndexed { i, _ -> getThumbColor(i) })
+        onValueChanged(thumbs)
 
         // TODO invalidate drawable
         invalidate()
@@ -931,7 +924,7 @@ class HSVCircleBar : View {
 
         state.thumbAngles.forEachIndexed { i, v -> thumbs[i].angleProgress = v }
         state.thumbRadii.forEachIndexed { i, v -> thumbs[i].radiusProgress = v }
-        onValueChanged(thumbs.mapIndexed { i, _ -> getThumbColor(i) })
+        onValueChanged(thumbs)
         invalidate()
     }
 
