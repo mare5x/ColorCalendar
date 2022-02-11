@@ -278,7 +278,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         val barValue = args.getFloat(BAR_VALUE_KEY)
         val profileType = args.getSerializable(PROFILE_TYPE) as ProfileType
 
-        val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorPickerBar)
+        val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorBar)
         colorPickerBar.setColors(minColor, maxColor)
         colorPickerBar.setNormProgress(barValue)
         colorPickerBar.setProfileType(profileType)

@@ -131,4 +131,12 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/profileColorButton" />
 
+    <Button
+        android:id="@+id/button2"
+        android:layout_width="199dp"
+        android:layout_height="147dp"
+        android:text="Button"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

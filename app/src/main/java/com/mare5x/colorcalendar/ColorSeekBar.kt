@@ -141,6 +141,26 @@ fun createHueGradientBitmap(width: Int) : Bitmap {
     return Bitmap.createBitmap(pixels, width, 1, Bitmap.Config.ARGB_8888)
 }
 
+// A ColorSeekBar without a progress bar.
+class ColorBar : View {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    private var startColor: Int = Color.BLACK
+    private var endColor: Int = Color.WHITE
+    var profileType: ProfileType = ProfileType.CIRCLE_SHORT
+        set(value) {
+            field = value
+            setColors(startColor, endColor)
+        }
+
+    fun setColors(startColor: Int, endColor: Int) {
+        this.startColor = startColor
+        this.endColor = endColor
+        background = HueGradientDrawable(startColor, endColor, false, profileType)
+    }
+}
+
 class ColorSeekBar2 : ColorSeekBar {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)

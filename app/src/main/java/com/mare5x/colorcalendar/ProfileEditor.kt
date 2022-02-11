@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
 import com.mare5x.colorcalendar.databinding.ActivityProfileEditorBinding
 import com.mare5x.colorcalendar.databinding.DialogColorPickerBinding
+import com.mare5x.colorcalendar.databinding.DialogTwoColorPickerBinding
 import java.text.DateFormat
 import java.util.*
 
@@ -142,7 +143,6 @@ class DatePickerFragment : DialogFragment() {
 class ColorPickerFragment : DialogFragment() {
     interface ColorPickerListener {
         fun onColorConfirm(color: Int)
-        fun onColorCancel() { }
     }
 
     private lateinit var listener: ColorPickerListener
@@ -184,7 +184,6 @@ class ColorPickerFragment : DialogFragment() {
         }
 
         binding.cancelButton.setOnClickListener {
-            listener.onColorCancel()
             if (showsDialog)
                 dismiss()
         }
@@ -230,7 +229,108 @@ class ColorPickerFragment : DialogFragment() {
 }
 
 
-class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerFragment.ColorPickerListener {
+class TwoColorPickerFragment : DialogFragment() {
+    interface ColorPickerListener {
+        fun onColorConfirm(colors: List<Int>)
+    }
+
+    private lateinit var listener: ColorPickerListener
+    private var _binding: DialogTwoColorPickerBinding? = null
+    private val binding get() = _binding!!
+
+    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
+        set(value) {
+            field = value
+            binding.colorCircleBar.setProfileType(value)
+            binding.colorBar.setProfileType(value)
+            when (value) {
+                ProfileType.CIRCLE_SHORT -> binding.circleSwitch.isChecked = false
+                ProfileType.CIRCLE_LONG -> binding.circleSwitch.isChecked = true
+                else -> TODO()
+            }
+            updateBarColors()
+        }
+
+    private val HSVs: List<FloatArray> = listOf(floatArrayOf(0f, 1f, 1f), floatArrayOf(0.25f, 1f, 1f))
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        _binding = DialogTwoColorPickerBinding.inflate(inflater, container, false)
+        return _binding?.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        requireArguments().let {
+            it.getIntArray(COLORS_KEY)?.forEachIndexed { i, color ->
+                Color.colorToHSV(color, HSVs[i])
+            }
+        }
+
+        HSVs.forEachIndexed { i, hsv ->
+            binding.colorCircleBar.setThumbColor(i, Color.HSVToColor(hsv))
+        }
+        binding.colorCircleBar.onValueChanged = { thumbs ->
+            HSVs.forEachIndexed { i, hsv ->
+                hsv[0] = thumbs[i].angleProgress * 360f
+                hsv[1] = thumbs[i].radiusProgress
+            }
+            updateBarColors()
+        }
+        binding.circleSwitch.setOnCheckedChangeListener { _, isChecked ->
+            profileType = when (isChecked) {
+                false -> ProfileType.CIRCLE_SHORT
+                true -> ProfileType.CIRCLE_LONG
+            }
+        }
+
+        binding.cancelButton.setOnClickListener {
+            if (showsDialog)
+                dismiss()
+        }
+        binding.confirmButton.setOnClickListener {
+            listener.onColorConfirm(HSVs.map { Color.HSVToColor(it) })
+            if (showsDialog)
+                dismiss()
+        }
+
+        updateBarColors()
+    }
+
+    private fun updateBarColors() {
+        binding.colorBar.setColors(Color.HSVToColor(HSVs[0]), Color.HSVToColor(HSVs[1]))
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as ColorPickerListener
+    }
+
+    companion object {
+        private const val COLORS_KEY = "colors_key"
+
+        fun create(colors: IntArray): TwoColorPickerFragment {
+            val fragment = TwoColorPickerFragment()
+            fragment.arguments = Bundle().apply {
+                putIntArray(COLORS_KEY, colors)
+            }
+            return fragment
+        }
+    }
+}
+
+
+
+class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerFragment.ColorPickerListener, TwoColorPickerFragment.ColorPickerListener {
     private lateinit var binding: ActivityProfileEditorBinding
     private lateinit var circleBar: HSVTwoColorBar
     private lateinit var colorBar: ColorSeekBar2
@@ -286,6 +386,11 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         if (actionBar != null) {
             actionBar.setDisplayHomeAsUpEnabled(!forceSelection)
             actionBar.setDisplayShowHomeEnabled(!forceSelection)
+        }
+
+        binding.button2.setOnClickListener {
+            val colors = IntArray(2, { i -> circleBar.getThumbColor(i) } )
+            TwoColorPickerFragment.create(colors).show(supportFragmentManager, "colorPicker")
         }
 
         circleBar = binding.colorCircleBar
@@ -462,6 +567,10 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         prefColor = color
         binding.profileColorButton.color = color
         profileFlags = profileFlags.setFlag1(ProfileFlag.FREE_PREF_COLOR)
+    }
+
+    override fun onColorConfirm(colors: List<Int>) {
+
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
