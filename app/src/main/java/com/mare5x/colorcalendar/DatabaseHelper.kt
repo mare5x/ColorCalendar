@@ -66,11 +66,10 @@ object DatabaseContract {
 
 
 enum class ProfileType(val value: Int) {
-    CIRCLE_SHORT(0),  // 0 must be default for old database compatibility
-    CIRCLE_LONG(1),
-    ONE_COLOR_SHADE(2),
-    FREE_COLOR(3),
-    BOOLEAN_COLOR(4);
+    TWO_COLOR_CIRCLE(0),  // 0 must be default for old database compatibility
+    FREE_COLOR(1);
+//    ONE_COLOR_SHADE(2),
+//    BOOLEAN_COLOR(3);
 
     companion object {
         fun fromInt(value: Int) = values().first { value == it.value }
@@ -78,7 +77,8 @@ enum class ProfileType(val value: Int) {
 }
 
 enum class ProfileFlag(val value: Int) {
-    CUSTOM_BANNER(1 shl 0)
+    CUSTOM_BANNER(1 shl 0),
+    CIRCLE_LONG(2 shl 0);  // Short or long circle for circle profile type
 }
 
 infix fun Int.hasFlag(flag: ProfileFlag): Boolean = this and flag.value > 0
@@ -95,7 +95,7 @@ data class ProfileEntry(
     var prefColor: Int = 0,
     var bannerColor: Int? = null,
     var creationDate: Date = Date(),
-    var type: ProfileType = ProfileType.CIRCLE_SHORT,
+    var type: ProfileType = ProfileType.TWO_COLOR_CIRCLE,
     var flags: Int = 0  // Extra flags, as Int because I don't know what I'll need ...
 )
 

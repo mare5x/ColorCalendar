@@ -22,10 +22,9 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.preference.*
-import com.mare5x.colorcalendar.databinding.ActivityProfileEditorBinding
 import com.mare5x.colorcalendar.databinding.DialogColorPickerBinding
 import com.mare5x.colorcalendar.databinding.DialogTwoColorPickerBinding
-import com.mare5x.colorcalendar.databinding.ProfileEditorActivity2Binding
+import com.mare5x.colorcalendar.databinding.ProfileEditorActivityBinding
 import java.text.DateFormat
 import java.util.*
 
@@ -240,23 +239,19 @@ class ColorPickerFragment : DialogFragment() {
 
 class TwoColorPickerFragment : DialogFragment() {
     interface ColorPickerListener {
-        fun onColorConfirm(colors: List<Int>, barColor: Int, profileType: ProfileType)
+        fun onColorConfirm(colors: List<Int>, barColor: Int, typeFlags: Int)
     }
 
     private lateinit var listener: ColorPickerListener
     private var _binding: DialogTwoColorPickerBinding? = null
     private val binding get() = _binding!!
 
-    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
+    private var typeFlags: Int = 0
         set(value) {
             field = value
-            binding.colorCircleBar.setProfileType(value)
-            binding.colorBar.setProfileType(value)
-            when (value) {
-                ProfileType.CIRCLE_SHORT -> binding.circleSwitch.isChecked = false
-                ProfileType.CIRCLE_LONG -> binding.circleSwitch.isChecked = true
-                else -> TODO()
-            }
+            binding.colorCircleBar.setTypeFlags(value)
+            binding.colorBar.setTypeFlags(value)
+            binding.circleSwitch.isChecked = value hasFlag ProfileFlag.CIRCLE_LONG
             updateBarColors()
         }
 
@@ -278,7 +273,7 @@ class TwoColorPickerFragment : DialogFragment() {
             it.getIntArray(COLORS_KEY)?.forEachIndexed { i, color ->
                 Color.colorToHSV(color, hsvs[i])
             }
-            profileType = it.getSerializable(PROFILE_TYPE_KEY) as ProfileType
+            typeFlags = it.getInt(PROFILE_FLAGS_KEY)
             binding.colorBar.setNormProgress(it.getFloat(BAR_VALUE_KEY))
         }
 
@@ -293,10 +288,7 @@ class TwoColorPickerFragment : DialogFragment() {
             updateBarColors()
         }
         binding.circleSwitch.setOnCheckedChangeListener { _, isChecked ->
-            profileType = when (isChecked) {
-                false -> ProfileType.CIRCLE_SHORT
-                true -> ProfileType.CIRCLE_LONG
-            }
+            typeFlags = typeFlags.setFlag(ProfileFlag.CIRCLE_LONG, isChecked)
         }
 
         binding.cancelButton.setOnClickListener {
@@ -304,7 +296,7 @@ class TwoColorPickerFragment : DialogFragment() {
                 dismiss()
         }
         binding.confirmButton.setOnClickListener {
-            listener.onColorConfirm(hsvs.map { Color.HSVToColor(it) }, binding.colorBar.getColor(), profileType)
+            listener.onColorConfirm(hsvs.map { Color.HSVToColor(it) }, binding.colorBar.getColor(), typeFlags)
             if (showsDialog)
                 dismiss()
         }
@@ -328,14 +320,14 @@ class TwoColorPickerFragment : DialogFragment() {
 
     companion object {
         private const val COLORS_KEY = "colors_key"
-        private const val PROFILE_TYPE_KEY = "type_key"
+        private const val PROFILE_FLAGS_KEY = "type_key"
         private const val BAR_VALUE_KEY = "bar_value"
 
-        fun create(colors: IntArray, type: ProfileType, barValue: Float): TwoColorPickerFragment {
+        fun create(colors: IntArray, typeFlags: Int, barValue: Float): TwoColorPickerFragment {
             val fragment = TwoColorPickerFragment()
             fragment.arguments = Bundle().apply {
                 putIntArray(COLORS_KEY, colors)
-                putSerializable(PROFILE_TYPE_KEY, type)
+                putSerializable(PROFILE_FLAGS_KEY, typeFlags)
                 putFloat(BAR_VALUE_KEY, barValue)
             }
             return fragment
@@ -377,7 +369,7 @@ class ProfileEditorViewModel(var profileId: Long, db: DatabaseHelper) : ViewMode
         profileType.value = profile.type
         profileFlags.value = profile.flags
 
-        prefBarProgress = calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.type)
+        prefBarProgress = calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.flags)
     }
 
     fun makeProfile(): ProfileEntry {
@@ -454,7 +446,7 @@ class ColorBarPreference : Preference {
         colorBar = holder.itemView.findViewById(R.id.colorBar)
         val viewModel = (preferenceDataStore as ProfileEditorDataStore).model
         colorBar?.setColors(viewModel.minColor.value!!, viewModel.maxColor.value!!)
-        colorBar?.profileType = viewModel.profileType.value!!
+        colorBar?.typeFlags = viewModel.profileFlags.value!!
         colorBar?.setNormProgress(viewModel.prefBarProgress)
         // Must be set last
         colorBar?.onValueChanged = { t, color ->
@@ -465,10 +457,10 @@ class ColorBarPreference : Preference {
 
     fun update(viewModel: ProfileEditorViewModel) {
         colorBar?.setColors(viewModel.minColor.value!!, viewModel.maxColor.value!!)
-        colorBar?.profileType = viewModel.profileType.value!!
+        colorBar?.typeFlags = viewModel.profileFlags.value!!
         colorBar?.setNormProgress(
             calcGradientProgress(viewModel.minColor.value!!, viewModel.maxColor.value!!,
-                viewModel.prefColor.value!!, viewModel.profileType.value!!))
+                viewModel.prefColor.value!!, viewModel.profileFlags.value!!))
     }
 }
 
@@ -522,7 +514,7 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
         colorBarPreference.setOnPreferenceClickListener {
             val colors = intArrayOf(viewModel.minColor.value!!, viewModel.maxColor.value!!)
             TwoColorPickerFragment
-                .create(colors, viewModel.profileType.value ?: ProfileType.CIRCLE_SHORT, viewModel.prefBarProgress)
+                .create(colors, viewModel.profileFlags.value ?: 0, viewModel.prefBarProgress)
                 .show(childFragmentManager, "colorPicker")
             true
         }
@@ -532,7 +524,7 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
         viewModel.maxColor.observe(viewLifecycleOwner) {
             colorBarPreference.update(viewModel)
         }
-        viewModel.profileType.observe(viewLifecycleOwner) {
+        viewModel.profileFlags.observe(viewLifecycleOwner) {
             colorBarPreference.update(viewModel)
         }
         viewModel.prefColor.observe(viewLifecycleOwner) { color ->
@@ -544,7 +536,7 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
 }
 
 class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerFragment.ColorPickerListener, TwoColorPickerFragment.ColorPickerListener {
-    private lateinit var binding: ProfileEditorActivity2Binding
+    private lateinit var binding: ProfileEditorActivityBinding
     private lateinit var db: DatabaseHelper
     private val viewModel: ProfileEditorViewModel by viewModels()
 
@@ -559,7 +551,7 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         db = DatabaseHelper(applicationContext)
 
         super.onCreate(savedInstanceState)
-        binding = ProfileEditorActivity2Binding.inflate(layoutInflater)
+        binding = ProfileEditorActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
 
@@ -698,292 +690,17 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         viewModel.bannerColor.value = color
     }
 
-    override fun onColorConfirm(colors: List<Int>, barColor: Int, profileType: ProfileType) {
+    override fun onColorConfirm(colors: List<Int>, barColor: Int, typeFlags: Int) {
         // Color range picker callback
         viewModel.minColor.value = colors[0]
         viewModel.maxColor.value = colors[1]
         viewModel.prefColor.value = barColor
-        viewModel.profileType.value = profileType
+        viewModel.profileFlags.value = typeFlags
     }
 
     companion object {
         const val FORCE_SELECTION_KEY = "force_selection_key"
         const val PROFILE_ID_KEY = "profile_id_key"
         const val PROFILE_EDIT_MSG_KEY = "profile_editor_msg"
-    }
-}
-
-
-class __OLD__ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerFragment.ColorPickerListener, TwoColorPickerFragment.ColorPickerListener {
-    private lateinit var binding: ActivityProfileEditorBinding
-    private lateinit var circleBar: HSVTwoColorBar
-    private lateinit var colorBar: ColorSeekBar2
-
-    private var profileId: Long = -1L  // Used when editing profile.
-    private var profileCreationDate: Long = -1L
-    private var prefColor: Int = Color.GRAY
-    private var profileType: ProfileType = ProfileType.CIRCLE_SHORT
-        set(value) {
-            field = value
-            circleBar.setProfileType(value)
-            colorBar.profileType = value
-            when (value) {
-                ProfileType.CIRCLE_SHORT -> binding.circleSwitch.isChecked = false
-                ProfileType.CIRCLE_LONG -> binding.circleSwitch.isChecked = true
-                else -> TODO()
-            }
-            updateUIColor()
-        }
-    private var profileFlags: Int = 0
-        set(value) {
-            field = value
-            when {
-                value hasFlag ProfileFlag.CUSTOM_BANNER -> {
-                    binding.barRadioButton.isChecked = false
-                    binding.colorSeekBar.isEnabled = false
-                    binding.freeRadioButton.isChecked = true
-                }
-                value hasFlagNot ProfileFlag.CUSTOM_BANNER -> {
-                    binding.barRadioButton.isChecked = true
-                    binding.colorSeekBar.isEnabled = true
-                    binding.freeRadioButton.isChecked = false
-                }
-            }
-            updateUIColor()
-        }
-    private var forceSelection = false  // For first profile
-
-    private var year: Int = 0
-    private var month: Int = 0
-    private var dayOfMonth: Int = 0
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = ActivityProfileEditorBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        setSupportActionBar(binding.toolbar)
-
-        forceSelection = intent.getBooleanExtra(FORCE_SELECTION_KEY, false)
-
-        // Add back arrow to toolbar (shouldn't it be automatic???)
-        val actionBar = supportActionBar
-        if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(!forceSelection)
-            actionBar.setDisplayShowHomeEnabled(!forceSelection)
-        }
-
-        binding.button2.setOnClickListener {
-            val colors = IntArray(2, { i -> circleBar.getThumbColor(i) } )
-            TwoColorPickerFragment.create(colors, profileType, colorBar.getNormProgress()).show(supportFragmentManager, "colorPicker")
-        }
-
-        circleBar = binding.colorCircleBar
-        colorBar = binding.colorSeekBar
-        circleBar.onValueChanged = { _ ->
-            colorBar.setColors(circleBar.getThumbColor(0), circleBar.getThumbColor(1))
-            updateUIColor()
-        }
-        colorBar.onValueChanged = { _, _ ->
-            updateUIColor()
-        }
-        binding.dateButton.setOnClickListener {
-            DatePickerFragment.create(year, month, dayOfMonth).show(supportFragmentManager, "datePicker")
-        }
-        binding.circleSwitch.setOnCheckedChangeListener { _, isChecked ->
-            profileType = when (isChecked) {
-                false -> ProfileType.CIRCLE_SHORT
-                true -> ProfileType.CIRCLE_LONG
-            }
-        }
-        binding.barRadioButton.setOnClickListener {
-            profileFlags = profileFlags.setFlag0(ProfileFlag.CUSTOM_BANNER)
-        }
-        binding.freeRadioButton.setOnClickListener {
-            profileFlags = profileFlags.setFlag1(ProfileFlag.CUSTOM_BANNER)
-        }
-
-        binding.profileColorButton.setOnClickListener {
-            ColorPickerFragment.create(prefColor).show(supportFragmentManager, "colorPicker")
-        }
-
-        profileId = intent.getLongExtra(PROFILE_ID_KEY, -1L)
-        intent.getSerializableExtra(PROFILE_TYPE_KEY).let { type ->
-            val t = savedInstanceState?.getSerializable(PROFILE_TYPE_KEY) ?: type
-            if (t != null)
-                profileType = t as ProfileType
-        }
-
-        // NOTE: since time is measured since 1970, dates before that are negative!
-        intent.getLongExtra(PROFILE_CREATION_DATE_KEY, -1L).let { date ->
-            profileCreationDate = date
-            val d =
-                if (date == -1L) Calendar.getInstance()
-                else Calendar.getInstance().apply { timeInMillis = date }
-            val year = savedInstanceState?.getInt(YEAR_KEY, d.get(Calendar.YEAR)) ?: d.get(Calendar.YEAR)
-            val month = savedInstanceState?.getInt(MONTH_KEY, d.get(Calendar.MONTH)) ?: d.get(Calendar.MONTH)
-            val day = savedInstanceState?.getInt(DAY_KEY, d.get(Calendar.DAY_OF_MONTH)) ?: d.get(Calendar.DAY_OF_MONTH)
-            onDateSet(null, year, month, day)
-        }
-
-        intent.getStringExtra(PROFILE_NAME_KEY).let { name ->
-            if (name != null) {
-                binding.profileNameEdit.setText(name)
-            }
-        }
-        intent.getIntExtra(PROFILE_MIN_COLOR_KEY, circleBar.getThumbColor(0)).let { color ->
-            circleBar.setThumbColor(0, color)
-        }
-        intent.getIntExtra(PROFILE_MAX_COLOR_KEY, circleBar.getThumbColor(1)).let { color ->
-            circleBar.setThumbColor(1, color)
-        }
-
-        colorBar.setNormProgress(0.8f)
-        colorBar.setColors(circleBar.getThumbColor(0), circleBar.getThumbColor(1))
-
-        intent.getIntExtra(PROFILE_FLAGS_KEY, 0).let { flags ->
-            profileFlags = savedInstanceState?.getInt(PROFILE_FLAGS_KEY, flags) ?: flags
-        }
-
-        intent.getIntExtra(PROFILE_PREF_COLOR_KEY, colorBar.getColor()).let { color ->
-            val c = savedInstanceState?.getInt(PROFILE_PREF_COLOR_KEY, color) ?: color
-            prefColor = c
-            binding.profileColorButton.color = c
-            if (profileFlags hasFlagNot ProfileFlag.CUSTOM_BANNER) {
-                colorBar.setNormProgress(calcGradientProgress(circleBar.getThumbColor(0), circleBar.getThumbColor(1), c, profileType))
-            }
-        }
-
-        updateUIColor()
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_profile_editor, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            android.R.id.home -> {
-                attemptDismiss()
-                true
-            }
-            R.id.action_confirm_profile -> {
-                confirmProfile()
-                dismiss()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
-    override fun onBackPressed() {
-        if (forceSelection) {
-            confirmProfile()
-            dismiss()
-        } else {
-            attemptDismiss()
-        }
-    }
-
-    override fun onProfileDiscard() {
-        dismiss()
-    }
-
-    private fun attemptDismiss() {
-        val msg = if (profileId < 0) "Discard this profile?" else "Discard changes?"
-        val dialog = ProfileDiscardDialog.create(msg)
-        dialog.show(supportFragmentManager, "profileDiscard")
-    }
-
-    private fun dismiss() {
-        super.onBackPressed()
-    }
-
-    private fun confirmProfile() {
-        Toast.makeText(this, """Profile ${if (profileId < 0) "created" else "updated"}""", Toast.LENGTH_SHORT).show()
-
-        val intent = Intent().apply {
-            putExtra(PROFILE_ID_KEY, profileId)
-            putExtra(PROFILE_NAME_KEY, binding.profileNameEdit.text.toString())
-            putExtra(PROFILE_MIN_COLOR_KEY, circleBar.getThumbColor(0))
-            putExtra(PROFILE_MAX_COLOR_KEY, circleBar.getThumbColor(1))
-            putExtra(PROFILE_PREF_COLOR_KEY,
-                if (profileFlags hasFlag ProfileFlag.CUSTOM_BANNER) prefColor
-                else colorBar.getColor())
-            putExtra(PROFILE_CREATION_DATE_KEY, profileCreationDate)
-            putExtra(PROFILE_TYPE_KEY, profileType)
-            putExtra(PROFILE_FLAGS_KEY, profileFlags)
-        }
-        setResult(RESULT_OK, intent)
-    }
-
-    private fun updateUIColor() {
-        if (profileFlags hasFlag ProfileFlag.CUSTOM_BANNER) {
-            setUIColor(prefColor)
-        } else {
-            setUIColor(colorBar.getColor())
-        }
-    }
-
-    private fun setUIColor(color: Int) {
-        supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.statusBarColor = dimColor(color, 0.8f)
-        }
-    }
-
-    override fun onDateSet(view: DatePicker?, year: Int, month: Int, dayOfMonth: Int) {
-        // Store selected date, so that we can reopen the date picker dialog at the saved date.
-        this.year = year
-        this.month = month
-        this.dayOfMonth = dayOfMonth
-
-        // month \in [0, 11]
-        profileCreationDate = Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.MONTH, month)
-            set(Calendar.DAY_OF_MONTH, dayOfMonth)
-        }.timeInMillis
-        binding.dateButton.text = DateFormat.getDateInstance().format(Date(profileCreationDate))
-    }
-
-    override fun onColorConfirm(color: Int) {
-        prefColor = color
-        binding.profileColorButton.color = color
-        profileFlags = profileFlags.setFlag1(ProfileFlag.CUSTOM_BANNER)
-    }
-
-    override fun onColorConfirm(colors: List<Int>, barColor: Int, profileType: ProfileType) {
-
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-
-        // So that the set date is not lost on configuration change.
-        outState.apply {
-            putInt(YEAR_KEY, year)
-            putInt(MONTH_KEY, month)
-            putInt(DAY_KEY, dayOfMonth)
-            putSerializable(PROFILE_TYPE_KEY, profileType)
-            putInt(PROFILE_FLAGS_KEY, profileFlags)
-            putInt(PROFILE_PREF_COLOR_KEY, prefColor)
-        }
-    }
-
-    companion object {
-        const val YEAR_KEY = "YEAR_KEY"
-        const val MONTH_KEY = "MONTH_KEY"
-        const val DAY_KEY = "DAY_KEY"
-
-        const val FORCE_SELECTION_KEY = "force_selection_key"
-        const val PROFILE_ID_KEY = "profile_id_key"
-        const val PROFILE_NAME_KEY = "profile_name_key"
-        const val PROFILE_MIN_COLOR_KEY = "profile_min_color_key"
-        const val PROFILE_MAX_COLOR_KEY = "profile_max_color_key"
-        const val PROFILE_PREF_COLOR_KEY = "profile_pref_color_key"
-        const val PROFILE_CREATION_DATE_KEY = "profile_creation_date_key"
-        const val PROFILE_TYPE_KEY = "profile_type_key"
-        const val PROFILE_FLAGS_KEY = "profile_flags_key"
     }
 }
