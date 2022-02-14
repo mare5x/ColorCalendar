@@ -15,7 +15,7 @@ import java.util.*
 // https://developer.android.com/training/data-storage/sqlite#DefineContract
 object DatabaseContract {
     const val DB_NAME = "database.db"
-    const val DB_VERSION = 2
+    const val DB_VERSION = 3
 
     object ProfileEntryDB : BaseColumns {
         const val ID = BaseColumns._ID
@@ -50,6 +50,7 @@ object DatabaseContract {
         const val DATE = "_date"
         const val VALUE = "value"
         const val PROFILE_FK = "profile_id"
+        const val COLOR = "color"
 
         const val DB_CREATE = """
             CREATE TABLE $TABLE_NAME(
@@ -57,6 +58,7 @@ object DatabaseContract {
                 $PROFILE_FK INTEGER NOT NULL,
                 $DATE INTEGER NOT NULL,
                 $VALUE REAL NOT NULL,
+                $COLOR INTEGER
                 
                 FOREIGN KEY (${PROFILE_FK}) REFERENCES ${ProfileEntryDB.TABLE_NAME} ($ID)
             );
@@ -78,7 +80,7 @@ enum class ProfileType(val value: Int) {
 
 enum class ProfileFlag(val value: Int) {
     CUSTOM_BANNER(1 shl 0),
-    CIRCLE_LONG(2 shl 0);  // Short or long circle for circle profile type
+    CIRCLE_LONG(1 shl 1);  // Short or long circle for circle profile type
 }
 
 infix fun Int.hasFlag(flag: ProfileFlag): Boolean = this and flag.value > 0
@@ -103,7 +105,8 @@ data class Entry(
     var id: Long = -1,
     var profile: ProfileEntry? = null,
     var date: Date = Date(),
-    var value: Float = 0f
+    var value: Float = 0f,  // Progress bar value
+    var color: Int? = null  // null or not depends on profile type: free color -> not null
 ) : Comparable<Entry> {
 
     // Order Entries by date
@@ -143,6 +146,17 @@ fun readProfileEntry(cursor: Cursor) : ProfileEntry {
     return profile
 }
 
+fun readEntry(cursor: Cursor, profile: ProfileEntry? = null): Entry {
+    val entryDB = DatabaseContract.EntryDB
+    val entry = Entry(
+        id = cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.ID)),
+        profile = profile,
+        date = Date(cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.DATE))),
+        value = cursor.getFloat(cursor.getColumnIndexOrThrow(entryDB.VALUE)),
+        color = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(entryDB.COLOR))
+    )
+    return entry
+}
 
 fun queryAllProfiles(db: SQLiteDatabase): Array<ProfileEntry> {
     val profileDB = DatabaseContract.ProfileEntryDB
@@ -174,12 +188,7 @@ fun queryAllEntries(db: SQLiteDatabase, profile: ProfileEntry) : Array<Entry> {
     val cursor = db.rawQuery(queryStr, null)
     cursor.moveToFirst()
     val res = Array(cursor.count) {
-        val entry = Entry(
-            id = cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.ID)),
-            profile = profile,
-            date = Date(cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.DATE))),
-            value = cursor.getFloat(cursor.getColumnIndexOrThrow(entryDB.VALUE))
-        )
+        val entry = readEntry(cursor, profile)
         cursor.moveToNext()
         entry
     }
@@ -201,14 +210,12 @@ fun queryClosestEntry(db: SQLiteDatabase, profile: ProfileEntry, date: Date) : E
         LIMIT 1
     """.trimIndent()
 
-    val entry = Entry()
     val cursor = db.rawQuery(queryStr, null)
     cursor.moveToFirst()
-    if (cursor.count > 0) {
-        entry.id = cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.ID))
-        entry.profile = profile
-        entry.date = Date(cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.DATE)))
-        entry.value = cursor.getFloat(cursor.getColumnIndexOrThrow(entryDB.VALUE))
+    val entry = if (cursor.count > 0) {
+        readEntry(cursor, profile)
+    } else {
+        Entry()
     }
     cursor.close()
     return entry
@@ -232,8 +239,10 @@ class DatabaseHelper : SQLiteOpenHelper {
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion == 1 && newVersion == 2) {
-            val profileDB = DatabaseContract.ProfileEntryDB
+        val profileDB = DatabaseContract.ProfileEntryDB
+        val entryDB = DatabaseContract.EntryDB
+        var version = oldVersion
+        if (version == 1 && version < newVersion) {
             db.execSQL("""
                 ALTER TABLE ${profileDB.TABLE_NAME}
                 ADD COLUMN ${profileDB.BANNER_COLOR} INTEGER 
@@ -246,6 +255,16 @@ class DatabaseHelper : SQLiteOpenHelper {
                 ALTER TABLE ${profileDB.TABLE_NAME}
                 ADD COLUMN ${profileDB.PROFILE_FLAGS} INTEGER 
             """.trimIndent())
+
+            version += 1
+        }
+        if (version == 2 && version < newVersion) {
+            db.execSQL("""
+                ALTER TABLE ${entryDB.TABLE_NAME}
+                ADD COLUMN ${entryDB.COLOR} INTEGER 
+            """.trimIndent())
+
+            version += 1
         }
     }
 
@@ -308,6 +327,7 @@ class DatabaseHelper : SQLiteOpenHelper {
             put(entryDB.DATE, entry.date.time)
             put(entryDB.VALUE, entry.value)
             put(entryDB.PROFILE_FK, entry.profile!!.id)
+            put(entryDB.COLOR, entry.color)
         }
 
         try {
@@ -337,37 +357,6 @@ class DatabaseHelper : SQLiteOpenHelper {
 
     fun queryAllProfiles(): Array<ProfileEntry> {
         return queryAllProfiles(writableDatabase)
-    }
-
-    fun queryEntry(id: Long): Entry {
-        val entry = Entry()
-        val entryDB = DatabaseContract.EntryDB
-
-        val queryStr = """
-            SELECT *
-            FROM ${entryDB.TABLE_NAME}
-            WHERE _id = $id
-        """.trimIndent()
-
-        var cursor: Cursor? = null
-        try {
-            cursor = writableDatabase.rawQuery(queryStr, null)
-            cursor.moveToFirst()
-            if (cursor.count == 0) {
-                return Entry()
-            }
-
-            val profileFk = cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.PROFILE_FK))
-            entry.id = id
-            entry.profile = queryProfile(profileFk)
-            entry.date = Date(cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.DATE)))
-            entry.value = cursor.getFloat(cursor.getColumnIndexOrThrow(entryDB.VALUE))
-        } catch (e: Exception) {
-            Log.e(TAG, "queryEntry: ", e)
-        } finally {
-            cursor?.close()
-        }
-        return entry
     }
 
     fun queryAllEntries(profile: ProfileEntry) : Array<Entry> {
@@ -403,6 +392,7 @@ class DatabaseHelper : SQLiteOpenHelper {
                     put(entryDB.DATE, entry.date.time)
                     put(entryDB.VALUE, entry.value)
                     put(entryDB.PROFILE_FK, entry.profile!!.id)
+                    put(entryDB.COLOR, entry.color)
                 }
                 writableDatabase.insertOrThrow(entryDB.TABLE_NAME, null, values)
             }

@@ -148,7 +148,7 @@ class DatePickerFragment : DialogFragment() {
 }
 
 
-class ColorPickerFragment : DialogFragment() {
+class ColorPickerDialogFragment : DialogFragment() {
     interface ColorPickerListener {
         fun onColorConfirm(color: Int)
     }
@@ -226,8 +226,8 @@ class ColorPickerFragment : DialogFragment() {
     companion object {
         private const val COLOR_KEY = "color_key"
 
-        fun create(color: Int): ColorPickerFragment {
-            val fragment = ColorPickerFragment()
+        fun create(color: Int): ColorPickerDialogFragment {
+            val fragment = ColorPickerDialogFragment()
             fragment.arguments = Bundle().apply {
                 putInt(COLOR_KEY, color)
             }
@@ -408,12 +408,14 @@ class ProfileEditorDataStore(val model: ProfileEditorViewModel) : PreferenceData
     override fun putString(key: String?, value: String?) {
         when (key) {
             "profile_name" -> model.name.value = value ?: ""
+            "profile_type" -> model.profileType.value = ProfileType.valueOf(value!!)
         }
     }
 
     override fun getString(key: String?, defValue: String?): String? {
         return when (key) {
             "profile_name" -> model.name.value
+            "profile_type" -> model.profileType.value?.name
             else -> defValue
         }
     }
@@ -479,10 +481,6 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
         profileNamePref.setOnBindEditTextListener { editor ->
             editor.setText(viewModel.name.value)
         }
-        viewModel.name.observe(viewLifecycleOwner) { profileName ->
-            profileNamePref.summary = profileName
-        }
-
         val profileDatePref = findPreference<Preference>("profile_date")!!
         profileDatePref.setOnPreferenceClickListener {
             val c = Calendar.getInstance().apply { time = viewModel.profileDate.value!! }
@@ -491,24 +489,14 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
                 .show(childFragmentManager, "datePicker")
             true
         }
-        viewModel.profileDate.observe(viewLifecycleOwner) { date ->
-            profileDatePref.summary = DateFormat.getDateInstance().format(date)
-        }
-
         val profileBannerColor = findPreference<Preference>("profile_banner_color")!!
         profileBannerColor.setOnPreferenceClickListener {
-            ColorPickerFragment
+            ColorPickerDialogFragment
                 .create(viewModel.bannerColor.value ?: viewModel.prefColor.value!!)
                 .show(childFragmentManager, "colorPicker")
             true
         }
-        viewModel.bannerColor.observe(viewLifecycleOwner) { color ->
-            profileBannerColor.icon = ColorRectDrawable(color ?: viewModel.prefColor.value!!)
-        }
         val profileBannerColorFlag = findPreference<CheckBoxPreference>("profile_banner_color_flag")!!
-        viewModel.profileFlags.observe(viewLifecycleOwner) { flags ->
-            profileBannerColorFlag.isChecked = flags hasFlag ProfileFlag.CUSTOM_BANNER
-        }
 
         val colorBarPreference = findPreference<ColorBarPreference>("profile_color_bar")!!
         colorBarPreference.setOnPreferenceClickListener {
@@ -518,24 +506,48 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
                 .show(childFragmentManager, "colorPicker")
             true
         }
+
+        val profileTypePreference = findPreference<ListPreference>("profile_type")!!
+        profileTypePreference.setEntries(R.array.profile_types_array)
+        profileTypePreference.entryValues = ProfileType.values().map { it.name }.toTypedArray()
+
+        viewModel.name.observe(viewLifecycleOwner) { profileName ->
+            profileNamePref.summary = profileName
+        }
+        viewModel.profileDate.observe(viewLifecycleOwner) { date ->
+            profileDatePref.summary = DateFormat.getDateInstance().format(date)
+        }
+        viewModel.bannerColor.observe(viewLifecycleOwner) { color ->
+            profileBannerColor.icon = ColorRectDrawable(color ?: viewModel.prefColor.value!!)
+        }
         viewModel.minColor.observe(viewLifecycleOwner) {
             colorBarPreference.update(viewModel)
         }
         viewModel.maxColor.observe(viewLifecycleOwner) {
             colorBarPreference.update(viewModel)
         }
-        viewModel.profileFlags.observe(viewLifecycleOwner) {
+        viewModel.profileFlags.observe(viewLifecycleOwner) { flags ->
             colorBarPreference.update(viewModel)
+            profileBannerColorFlag.isChecked = flags hasFlag ProfileFlag.CUSTOM_BANNER
         }
         viewModel.prefColor.observe(viewLifecycleOwner) { color ->
             if (viewModel.bannerColor.value == null) {
                 profileBannerColor.icon = ColorRectDrawable(color)
             }
         }
+        viewModel.profileType.observe(viewLifecycleOwner) { type ->
+            profileTypePreference.value = type.name
+            when (type) {
+                ProfileType.TWO_COLOR_CIRCLE -> colorBarPreference.isVisible = true
+                ProfileType.FREE_COLOR -> {
+                    colorBarPreference.isVisible = false
+                }
+            }
+        }
     }
 }
 
-class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerFragment.ColorPickerListener, TwoColorPickerFragment.ColorPickerListener {
+class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerDialogFragment.ColorPickerListener, TwoColorPickerFragment.ColorPickerListener {
     private lateinit var binding: ProfileEditorActivityBinding
     private lateinit var db: DatabaseHelper
     private val viewModel: ProfileEditorViewModel by viewModels()

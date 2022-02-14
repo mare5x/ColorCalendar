@@ -3,6 +3,7 @@ package com.mare5x.colorcalendar
 import android.app.Dialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
 import android.util.AttributeSet
 import android.view.LayoutInflater
@@ -61,7 +62,9 @@ class EntryAdapter(
         when (holder) {
             is EntryViewHolder -> {
                 val entry = entries[position]
-                holder.colorItem.setColor(calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags))
+                holder.colorItem.setColor(
+                    entry.color
+                        ?: calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags))
                 holder.entryText.text = entryDateFormat.format(entry.date)
             }
             is AdderViewHolder -> {
@@ -122,7 +125,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
                 profilesViewModel.getClosestEntry(profile, makeDate(0, 0))
             } else entries.last()
             // Don't compare by e.id because new entries don't have ids yet.
-            val dialog = EntryEditorDialog.create(profile, if (e.profile == null) null else e.value)
+            val dialog = EntryEditorDialog.create(profile, if (e.profile == null) null else e)
             dialog.show(childFragmentManager, "EntryEditorDialog")
         }
         val viewer = view.findViewById<EntryViewer>(R.id.entryViewer)
@@ -204,14 +207,25 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         return t.time
     }
 
-    override fun onEntryCancel() {}
-
     override fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) {
         val t = makeDate(hourOfDay, minute)
         val entry = Entry(
             profile = this.profile,
             value = value,
             date = t
+        )
+        entries.add(entry)
+        entriesChanged = true
+        adapter.notifyItemInserted(entries.size - 1)
+    }
+
+    override fun onEntryConfirm(color: Int, hourOfDay: Int, minute: Int) {
+        val t = makeDate(hourOfDay, minute)
+        val entry = Entry(
+            profile = this.profile,
+            value = 1f,
+            date = t,
+            color = color
         )
         entries.add(entry)
         entriesChanged = true
@@ -245,8 +259,9 @@ class EntryViewer : RecyclerView {
 
 class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
     interface EntryEditorListener {
-        fun onEntryCancel()
-        fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int)
+        fun onEntryCancel() { }
+        fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) { }
+        fun onEntryConfirm(color: Int, hourOfDay: Int, minute: Int) { }
     }
 
     private var listener: EntryEditorListener? = null
@@ -266,22 +281,63 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        return inflater.inflate(R.layout.dialog_entry_editor, container, false)
+        val profileType = requireArguments().getSerializable(PROFILE_TYPE) as ProfileType
+        return when (profileType) {
+            ProfileType.TWO_COLOR_CIRCLE -> inflater.inflate(R.layout.dialog_entry_editor, container, false)
+            ProfileType.FREE_COLOR -> inflater.inflate(R.layout.dialog_entry_editor_free, container, false)
+        }
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
+    private fun onViewCreatedBar(view: View, savedInstanceState: Bundle?) {
         val args = requireArguments()
         val minColor = args.getInt(LOW_COLOR_KEY)
         val maxColor = args.getInt(HIGH_COLOR_KEY)
         val barValue = args.getFloat(BAR_VALUE_KEY)
         val typeFlags = args.getInt(PROFILE_FLAGS)
 
-        val colorPickerBar = view.findViewById<ColorPickerBar>(R.id.colorBar)
-        colorPickerBar.setColors(minColor, maxColor)
-        colorPickerBar.setNormProgress(barValue)
-        colorPickerBar.setTypeFlags(typeFlags)
+        val colorBar = view.findViewById<ColorPickerBar>(R.id.colorBar)
+        colorBar.setColors(minColor, maxColor)
+        colorBar.setNormProgress(barValue)
+        colorBar.setTypeFlags(typeFlags)
+    }
+
+    private fun onViewCreatedCircle(view: View, savedInstanceState: Bundle?) {
+        val args = requireArguments()
+
+        val colorBar = view.findViewById<ColorPickerBar>(R.id.colorBar)
+        val colorPickerCircle = view.findViewById<HSVCircleBar>(R.id.colorPickerCircle)
+
+        val hsv = floatArrayOf(0f, 1f, 1f)
+        Color.colorToHSV(args.getInt(PREFERRED_COLOR), hsv)
+
+        colorPickerCircle.setThumbColor(0, Color.HSVToColor(hsv))
+        colorPickerCircle.onValueChanged = { thumbs ->
+            thumbs.first().let {
+                hsv[0] = it.angleProgress * 360f
+                hsv[1] = it.radiusProgress
+            }
+            colorBar.setColors(Color.BLACK, colorPickerCircle.getThumbColor(0))
+        }
+
+        // Modify 'value' part of HSV
+        colorBar.setIsLinear(true)
+        colorBar.setNormProgress(hsv[2])
+        colorBar.onValueChanged = { value, _ ->
+            hsv[2] = value
+        }
+        colorBar.setColors(Color.BLACK, colorPickerCircle.getThumbColor(0))
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        val profileType = requireArguments().getSerializable(PROFILE_TYPE) as ProfileType
+        when (profileType) {
+            ProfileType.TWO_COLOR_CIRCLE -> onViewCreatedBar(view, savedInstanceState)
+            ProfileType.FREE_COLOR -> onViewCreatedCircle(view, savedInstanceState)
+        }
+
+        val colorBar = view.findViewById<ColorPickerBar>(R.id.colorBar)
 
         savedInstanceState?.let { state ->
             hourOfDay = state.getInt(HOUR_KEY, hourOfDay)
@@ -296,7 +352,12 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         }
         val confirmButton = view.findViewById<Button>(R.id.confirmButton)
         confirmButton.setOnClickListener {
-            listener?.onEntryConfirm(colorPickerBar.getNormProgress(), hourOfDay, minute)
+            when (profileType) {
+                ProfileType.TWO_COLOR_CIRCLE ->
+                    listener?.onEntryConfirm(colorBar.getNormProgress(), hourOfDay, minute)
+                ProfileType.FREE_COLOR ->
+                    listener?.onEntryConfirm(colorBar.getColor(), hourOfDay, minute)
+            }
             if (showsDialog)
                 dismiss()
         }
@@ -340,15 +401,28 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         const val HIGH_COLOR_KEY = "HIGH_COLOR_KEY"
         const val BAR_VALUE_KEY = "BAR_VALUE"
         const val PROFILE_FLAGS = "PROFILE_TYPE"
+        const val PROFILE_TYPE = "PROFILE_TYPE"
+        const val PREFERRED_COLOR = "PREFERRED_COLOR_KEY"
 
-        fun create(profile: ProfileEntry, barValue: Float? = null): EntryEditorDialog {
+        fun create(profile: ProfileEntry, closestEntry: Entry? = null): EntryEditorDialog {
             val fragment = EntryEditorDialog()
-            fragment.arguments = Bundle().apply {
-                putInt(LOW_COLOR_KEY, profile.minColor)
-                putInt(HIGH_COLOR_KEY, profile.maxColor)
-                putFloat(BAR_VALUE_KEY,
-                    barValue ?: calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.flags))
-                putInt(PROFILE_FLAGS, profile.flags)
+            when (profile.type) {
+                ProfileType.TWO_COLOR_CIRCLE ->
+                    fragment.arguments = Bundle().apply {
+                        putInt(LOW_COLOR_KEY, profile.minColor)
+                        putInt(HIGH_COLOR_KEY, profile.maxColor)
+                        putFloat(BAR_VALUE_KEY,
+                            if (closestEntry != null) closestEntry.value
+                            else calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.flags))
+                        putInt(PROFILE_FLAGS, profile.flags)
+                        putSerializable(PROFILE_TYPE, profile.type)
+                    }
+                ProfileType.FREE_COLOR ->
+                    fragment.arguments = Bundle().apply {
+                        putInt(PREFERRED_COLOR, closestEntry?.color ?: (profile.bannerColor ?: profile.prefColor))
+                        putInt(PROFILE_FLAGS, profile.flags)
+                        putSerializable(PROFILE_TYPE, profile.type)
+                    }
             }
             return fragment
         }

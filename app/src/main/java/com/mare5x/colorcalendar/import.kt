@@ -46,7 +46,7 @@ class ImportViewModel(importPath: String, db: DatabaseHelper, context: Context) 
                     val srcEntries = db.queryAllEntries(profiles[0])
                     val entries = queryAllEntries(importDB, profile).filter { entry ->
                         srcEntries.find { e ->
-                            e.value == entry.value && e.date == entry.date
+                            e.value == entry.value && e.date == entry.date && e.color == entry.color
                         } == null
                     }
                     entriesToImport[idx] = entries

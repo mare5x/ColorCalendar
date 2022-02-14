@@ -211,7 +211,7 @@ class MainActivity : AppCompatActivity(),
 
         findViewById<FloatingActionButton>(R.id.entry_fab).setOnClickListener {
             val e = profilesViewModel.getClosestEntry(currentProfile!!, Date())
-            val dialog = EntryEditorDialog.create(currentProfile!!, if (e.id < 0) null else e.value)
+            val dialog = EntryEditorDialog.create(currentProfile!!, if (e.id < 0) null else e)
             dialog.show(supportFragmentManager, "entryEditor")
         }
         val scrollFab = findViewById<FloatingActionButton>(R.id.scroll_fab)
@@ -404,8 +404,6 @@ class MainActivity : AppCompatActivity(),
         mainViewModel.deleteProfile(currentProfile!!)
     }
 
-    override fun onEntryCancel() {}
-
     override fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) {
         // Entries added using the floating action button always refer to today's date.
         val t = Calendar.getInstance().apply {
@@ -416,6 +414,21 @@ class MainActivity : AppCompatActivity(),
             profile = currentProfile,
             value = value,
             date = t.time
+        )
+        mainViewModel.insertEntry(entry)
+    }
+
+    override fun onEntryConfirm(color: Int, hourOfDay: Int, minute: Int) {
+        // Entries added using the floating action button always refer to today's date.
+        val t = Calendar.getInstance().apply {
+            set(Calendar.MINUTE, minute)
+            set(Calendar.HOUR_OF_DAY, hourOfDay)
+        }
+        val entry = Entry(
+            profile = currentProfile,
+            value = 1f,
+            date = t.time,
+            color = color
         )
         mainViewModel.insertEntry(entry)
     }

@@ -127,7 +127,11 @@ class ColorRectAdapter(var profile: ProfileEntry) :
             val day = dayPosition(position)
             val entry = if (dayEntries[day].size > 0) dayEntries[day].last() else null
             rect.setColor(
-                if (entry != null) calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags)
+                if (entry != null) {
+                    // Use the free color if set
+                    entry.color
+                        ?: calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags)
+                }
                 else Color.GRAY
             )
             rect.drawBorder = (day == dayEntries.size - 1)
