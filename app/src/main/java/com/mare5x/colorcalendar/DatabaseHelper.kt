@@ -24,6 +24,7 @@ object DatabaseContract {
         const val MIN_COLOR = "min_color"
         const val MAX_COLOR = "max_color"
         const val PREF_COLOR = "pref_color"
+        const val BANNER_COLOR = "banner_color"
         const val CREATION_DATE = "creation_date"
         const val PROFILE_TYPE = "profile_type"
         const val PROFILE_FLAGS = "flags"
@@ -35,6 +36,7 @@ object DatabaseContract {
                 $MIN_COLOR INTEGER NOT NULL,
                 $MAX_COLOR INTEGER NOT NULL,
                 $PREF_COLOR INTEGER NOT NULL,
+                $BANNER_COLOR INTEGER,
                 $CREATION_DATE INTEGER NOT NULL,
                 $PROFILE_TYPE INTEGER NOT NULL,
                 $PROFILE_FLAGS INTEGER 
@@ -76,20 +78,22 @@ enum class ProfileType(val value: Int) {
 }
 
 enum class ProfileFlag(val value: Int) {
-    FREE_PREF_COLOR(1 shl 0)
+    CUSTOM_BANNER(1 shl 0)
 }
 
 infix fun Int.hasFlag(flag: ProfileFlag): Boolean = this and flag.value > 0
 infix fun Int.hasFlagNot(flag: ProfileFlag) = !(this hasFlag flag)
 fun Int.setFlag0(flag: ProfileFlag): Int = this and flag.value.inv()
 fun Int.setFlag1(flag: ProfileFlag): Int = this or flag.value
+fun Int.setFlag(flag: ProfileFlag, b: Boolean): Int = if (b) this.setFlag1(flag) else this.setFlag0(flag)
 
 data class ProfileEntry(
     var id: Long = -1,
-    var name: String = "null",
+    var name: String = "",
     var minColor: Int = 0,
     var maxColor: Int = 0,
     var prefColor: Int = 0,
+    var bannerColor: Int? = null,
     var creationDate: Date = Date(),
     var type: ProfileType = ProfileType.CIRCLE_SHORT,
     var flags: Int = 0  // Extra flags, as Int because I don't know what I'll need ...
@@ -131,6 +135,7 @@ fun readProfileEntry(cursor: Cursor) : ProfileEntry {
         profile.minColor = getInt(getColumnIndexOrThrow(profileDB.MIN_COLOR))
         profile.maxColor = getInt(getColumnIndexOrThrow(profileDB.MAX_COLOR))
         profile.prefColor = getInt(getColumnIndexOrThrow(profileDB.PREF_COLOR))
+        profile.bannerColor = getIntOrNull(getColumnIndexOrThrow(profileDB.BANNER_COLOR))
         profile.creationDate = Date(getLong(getColumnIndexOrThrow(profileDB.CREATION_DATE)))
         profile.type = ProfileType.fromInt(getInt(getColumnIndexOrThrow(profileDB.PROFILE_TYPE)))
         profile.flags = getIntOrNull(getColumnIndexOrThrow(profileDB.PROFILE_FLAGS)) ?: 0
@@ -228,8 +233,11 @@ class DatabaseHelper : SQLiteOpenHelper {
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion == 1 && newVersion == 2) {
-            // Added ProfileType
             val profileDB = DatabaseContract.ProfileEntryDB
+            db.execSQL("""
+                ALTER TABLE ${profileDB.TABLE_NAME}
+                ADD COLUMN ${profileDB.BANNER_COLOR} INTEGER 
+            """.trimIndent())
             db.execSQL("""
                 ALTER TABLE ${profileDB.TABLE_NAME}
                 ADD COLUMN ${profileDB.PROFILE_TYPE} INTEGER NOT NULL DEFAULT 0
@@ -248,6 +256,7 @@ class DatabaseHelper : SQLiteOpenHelper {
             put(profileDB.MIN_COLOR, profile.minColor)
             put(profileDB.MAX_COLOR, profile.maxColor)
             put(profileDB.PREF_COLOR, profile.prefColor)
+            put(profileDB.BANNER_COLOR, profile.bannerColor)
             put(profileDB.CREATION_DATE, profile.creationDate.time)
             put(profileDB.PROFILE_TYPE, profile.type.value)
             put(profileDB.PROFILE_FLAGS, profile.flags)
@@ -268,6 +277,7 @@ class DatabaseHelper : SQLiteOpenHelper {
             put(profileDB.MIN_COLOR, profile.minColor)
             put(profileDB.MAX_COLOR, profile.maxColor)
             put(profileDB.PREF_COLOR, profile.prefColor)
+            put(profileDB.BANNER_COLOR, profile.bannerColor)
             put(profileDB.CREATION_DATE, profile.creationDate.time)
             put(profileDB.PROFILE_TYPE, profile.type.value)
             put(profileDB.PROFILE_FLAGS, profile.flags)

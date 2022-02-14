@@ -18,10 +18,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.math.MathUtils.clamp
 import androidx.core.view.MenuCompat
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
@@ -30,12 +27,6 @@ import java.io.File
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.max
-
-// NOTE: for constraint layout see the developer guide at:
-// https://developer.android.com/reference/androidx/constraintlayout/widget/ConstraintLayout
-// NOTE: fragment's parent must implement interface ... Using function callbacks doesn't work because of configuration changes ...!
-// NOTE: Dialogs use wrap_content for layout width and height ...
-
 
 /** https://medium.com/androiddevelopers/livedata-with-snackbar-navigation-and-other-events-the-singleliveevent-case-ac2622673150
  * Used as a wrapper for data that is exposed via a LiveData that represents an event.
@@ -82,17 +73,11 @@ class MainViewModel(val db: DatabaseHelper) : ViewModel() {
 
     fun getInsertedProfile() = insertedProfile
     fun insertProfile(profile: ProfileEntry) {
-        viewModelScope.launch(Dispatchers.IO) {
-            profile.id = db.insertProfile(profile)
-            insertedProfile.postValue(profile)
-        }
+        insertedProfile.postValue(profile)
     }
     fun getUpdatedProfile() = updatedProfile
     fun updateProfile(profile: ProfileEntry) {
-        viewModelScope.launch(Dispatchers.IO) {
-            db.updateProfile(profile)
-            updatedProfile.postValue(profile)
-        }
+        updatedProfile.postValue(profile)
     }
     fun getDeletedProfile() = deletedProfile
     fun deleteProfile(profile: ProfileEntry) {
@@ -254,12 +239,17 @@ class MainActivity : AppCompatActivity(),
 
         mainViewModel.getCurrentProfile().observe(this) { profile ->
             currentProfile = profile
-            setUIColor(profile.prefColor)
+            updateUIColor()
 
             val position = profilesViewModel.getPosition(profile)
             profileSpinner.setSelection(position)
             viewPager.currentItem = position
         }
+    }
+
+    override fun onDestroy() {
+        db.close()
+        super.onDestroy()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -290,13 +280,6 @@ class MainActivity : AppCompatActivity(),
                 if (profile != null) {
                     intent.run {
                         putExtra(ProfileEditorActivity.PROFILE_ID_KEY, profile.id)
-                        putExtra(ProfileEditorActivity.PROFILE_NAME_KEY, profile.name)
-                        putExtra(ProfileEditorActivity.PROFILE_MIN_COLOR_KEY, profile.minColor)
-                        putExtra(ProfileEditorActivity.PROFILE_MAX_COLOR_KEY, profile.maxColor)
-                        putExtra(ProfileEditorActivity.PROFILE_PREF_COLOR_KEY, profile.prefColor)
-                        putExtra(ProfileEditorActivity.PROFILE_CREATION_DATE_KEY, profile.creationDate.time)
-                        putExtra(ProfileEditorActivity.PROFILE_TYPE_KEY, profile.type)
-                        putExtra(ProfileEditorActivity.PROFILE_FLAGS_KEY, profile.flags)
                     }
                 }
                 startActivityForResult(intent, PROFILE_EDITOR_CODE)
@@ -329,22 +312,13 @@ class MainActivity : AppCompatActivity(),
             if (resultCode == RESULT_OK) {
                 val bundle = data?.extras
                 if (bundle != null) {
-                    val profile = ProfileEntry()
-                    profile.id = bundle.getLong(ProfileEditorActivity.PROFILE_ID_KEY, -1L)
-                    profile.name = bundle.getString(ProfileEditorActivity.PROFILE_NAME_KEY).toString()
-                    profile.minColor = bundle.getInt(ProfileEditorActivity.PROFILE_MIN_COLOR_KEY)
-                    profile.maxColor = bundle.getInt(ProfileEditorActivity.PROFILE_MAX_COLOR_KEY)
-                    profile.prefColor = bundle.getInt(ProfileEditorActivity.PROFILE_PREF_COLOR_KEY)
-                    profile.creationDate = bundle.getLong(ProfileEditorActivity.PROFILE_CREATION_DATE_KEY, -1L).let { date ->
-                        if (date == -1L) Date()
-                        else Date(date)
-                    }
-                    profile.type = bundle.getSerializable(ProfileEditorActivity.PROFILE_TYPE_KEY) as ProfileType
-                    profile.flags = bundle.getInt(ProfileEditorActivity.PROFILE_FLAGS_KEY, 0)
-                    if (profile.id == -1L) {
-                        mainViewModel.insertProfile(profile)
-                    } else {
-                        mainViewModel.updateProfile(profile)
+                    val profileId = bundle.getLong(ProfileEditorActivity.PROFILE_ID_KEY)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val profile = db.queryProfile(profileId)
+                        when (bundle.getString(ProfileEditorActivity.PROFILE_EDIT_MSG_KEY)) {
+                            "created" -> mainViewModel.insertProfile(profile)
+                            "updated" -> mainViewModel.updateProfile(profile)
+                        }
                     }
                 }
             }
@@ -357,6 +331,16 @@ class MainActivity : AppCompatActivity(),
             if (resultCode == RESULT_OK) {
                 val uri = data?.data
                 startImportDatabase(uri)
+            }
+        }
+    }
+
+    private fun updateUIColor() {
+        currentProfile?.let {
+            if (it.flags hasFlag ProfileFlag.CUSTOM_BANNER) {
+                setUIColor(it.bannerColor ?: it.prefColor)
+            } else {
+                setUIColor(it.prefColor)
             }
         }
     }

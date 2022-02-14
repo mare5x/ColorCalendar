@@ -4,11 +4,19 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.drawable.PaintDrawable
 import android.util.AttributeSet
 import android.view.View
 import kotlin.math.max
 import kotlin.math.min
 
+
+class ColorRectDrawable(color: Int) : PaintDrawable(color) {
+    init {
+        intrinsicWidth = 9999
+        intrinsicHeight = 9999
+    }
+}
 
 class ColorRect : View {
     constructor(context: Context) : super(context)

@@ -125,7 +125,11 @@ class ProfileSpinnerAdapter(
         val text = view.findViewById<TextView>(R.id.profileText)
         text.text = profile.name
         val color = view.findViewById<ColorRect>(R.id.profileColor)
-        color.setColor(profile.prefColor)
+        if (profile.flags hasFlag ProfileFlag.CUSTOM_BANNER) {
+            color.setColor(profile.bannerColor ?: profile.prefColor)
+        } else {
+            color.setColor(profile.prefColor)
+        }
 
         return view
     }

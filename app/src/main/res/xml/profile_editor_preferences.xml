@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <EditTextPreference
+        app:key="profile_name"
+        app:title="Set profile name" />
+
+    <Preference
+        app:key="profile_date"
+        app:title="Set start date" />
+
+    <com.mare5x.colorcalendar.ColorBarPreference
+        app:key="profile_color_bar"
+        app:title="Pick profile colors"
+        app:layout="@layout/preference_colorbar" />
+
+    <CheckBoxPreference
+        app:key="profile_banner_color_flag"
+        app:title="Use custom banner color" />
+
+    <Preference
+        app:key="profile_banner_color"
+        app:title="Pick banner color"
+        app:dependency="profile_banner_color_flag" />
+
+</PreferenceScreen>

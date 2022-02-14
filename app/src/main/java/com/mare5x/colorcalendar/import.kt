@@ -1,7 +1,6 @@
 package com.mare5x.colorcalendar
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -91,7 +90,10 @@ class ImportAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.profileText.text = profiles[position].name
-        holder.profileColor.setColor(profiles[position].prefColor)
+        holder.profileColor.setColor(profiles[position].let {
+            if (it.flags hasFlag ProfileFlag.CUSTOM_BANNER) it.bannerColor ?: it.prefColor
+            else it.prefColor
+        })
         holder.changesText.text = entries[position].size.toString()
 
         // Name conflict warning
