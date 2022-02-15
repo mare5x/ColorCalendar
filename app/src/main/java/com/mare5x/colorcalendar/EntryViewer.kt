@@ -257,7 +257,7 @@ class EntryViewer : RecyclerView {
     }
 }
 
-class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
+class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener, ColorPickerDialogFragment.ColorPickerListener {
     interface EntryEditorListener {
         fun onEntryCancel() { }
         fun onEntryConfirm(value: Float, hourOfDay: Int, minute: Int) { }
@@ -269,6 +269,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
     private var minute: Int = 0
 
     private lateinit var timeButton: Button
+    private lateinit var profileType: ProfileType
 
     init {
         val c = Calendar.getInstance()
@@ -281,7 +282,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val profileType = requireArguments().getSerializable(PROFILE_TYPE) as ProfileType
+        profileType = requireArguments().getSerializable(PROFILE_TYPE) as ProfileType
         return when (profileType) {
             ProfileType.TWO_COLOR_CIRCLE -> inflater.inflate(R.layout.dialog_entry_editor, container, false)
             ProfileType.FREE_COLOR -> inflater.inflate(R.layout.dialog_entry_editor_free, container, false)
@@ -295,10 +296,31 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         val barValue = args.getFloat(BAR_VALUE_KEY)
         val typeFlags = args.getInt(PROFILE_FLAGS)
 
-        val colorBar = view.findViewById<ColorPickerBar>(R.id.colorBar)
+        val colorBar = view.findViewById<ColorButtonBar>(R.id.colorBar)
         colorBar.setColors(minColor, maxColor)
         colorBar.setNormProgress(barValue)
         colorBar.setTypeFlags(typeFlags)
+        if (args.containsKey(FORCED_BAR_COLOR)) {
+            colorBar.setForcedColor(args.getInt(FORCED_BAR_COLOR))
+        }
+
+        // Free color on click
+        colorBar.onClick = {
+            ColorPickerDialogFragment
+                .create(colorBar.getColor())
+                .show(childFragmentManager, "colorPicker")
+        }
+
+        val confirmButton = view.findViewById<Button>(R.id.confirmButton)
+        confirmButton.setOnClickListener {
+            if (colorBar.forcedColor != null) {
+                listener?.onEntryConfirm(colorBar.forcedColor!!, hourOfDay, minute)
+            } else {
+                listener?.onEntryConfirm(colorBar.getNormProgress(), hourOfDay, minute)
+            }
+            if (showsDialog)
+                dismiss()
+        }
     }
 
     private fun onViewCreatedCircle(view: View, savedInstanceState: Bundle?) {
@@ -326,18 +348,22 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
             hsv[2] = value
         }
         colorBar.setColors(Color.BLACK, colorPickerCircle.getThumbColor(0))
+
+        val confirmButton = view.findViewById<Button>(R.id.confirmButton)
+        confirmButton.setOnClickListener {
+            listener?.onEntryConfirm(colorBar.getColor(), hourOfDay, minute)
+            if (showsDialog)
+                dismiss()
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val profileType = requireArguments().getSerializable(PROFILE_TYPE) as ProfileType
         when (profileType) {
             ProfileType.TWO_COLOR_CIRCLE -> onViewCreatedBar(view, savedInstanceState)
             ProfileType.FREE_COLOR -> onViewCreatedCircle(view, savedInstanceState)
         }
-
-        val colorBar = view.findViewById<ColorPickerBar>(R.id.colorBar)
 
         savedInstanceState?.let { state ->
             hourOfDay = state.getInt(HOUR_KEY, hourOfDay)
@@ -347,17 +373,6 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         val cancelButton = view.findViewById<Button>(R.id.cancelButton)
         cancelButton.setOnClickListener {
             listener?.onEntryCancel()
-            if (showsDialog)
-                dismiss()
-        }
-        val confirmButton = view.findViewById<Button>(R.id.confirmButton)
-        confirmButton.setOnClickListener {
-            when (profileType) {
-                ProfileType.TWO_COLOR_CIRCLE ->
-                    listener?.onEntryConfirm(colorBar.getNormProgress(), hourOfDay, minute)
-                ProfileType.FREE_COLOR ->
-                    listener?.onEntryConfirm(colorBar.getColor(), hourOfDay, minute)
-            }
             if (showsDialog)
                 dismiss()
         }
@@ -385,11 +400,27 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         timeButton.text = resources.getString(R.string.entry_time, hourOfDay, minute)
     }
 
+    override fun onColorConfirm(color: Int) {
+        // Callback for freely selectable color
+        val colorBar = view?.findViewById<ColorButtonBar>(R.id.colorBar)
+        colorBar?.setForcedColor(color)
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
 
         outState.putInt(HOUR_KEY, hourOfDay)
         outState.putInt(MINUTE_KEY, minute)
+
+        when (profileType) {
+            ProfileType.TWO_COLOR_CIRCLE -> {
+                val colorBar = view?.findViewById<ColorButtonBar>(R.id.colorBar)
+                colorBar?.forcedColor?.let {
+                    outState.putInt(FORCED_BAR_COLOR, it)
+                }
+            }
+            else -> {}
+        }
     }
 
     companion object {
@@ -403,6 +434,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
         const val PROFILE_FLAGS = "PROFILE_TYPE"
         const val PROFILE_TYPE = "PROFILE_TYPE"
         const val PREFERRED_COLOR = "PREFERRED_COLOR_KEY"
+        const val FORCED_BAR_COLOR = "FORCED_BAR_COLOR_KEY"
 
         fun create(profile: ProfileEntry, closestEntry: Entry? = null): EntryEditorDialog {
             val fragment = EntryEditorDialog()
@@ -414,6 +446,8 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener {
                         putFloat(BAR_VALUE_KEY,
                             if (closestEntry != null) closestEntry.value
                             else calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.flags))
+                        if (closestEntry != null && closestEntry.color != null)
+                            putInt(FORCED_BAR_COLOR, closestEntry.color!!)
                         putInt(PROFILE_FLAGS, profile.flags)
                         putSerializable(PROFILE_TYPE, profile.type)
                     }

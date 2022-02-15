@@ -33,7 +33,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.mare5x.colorcalendar.ColorPickerBar
+    <com.mare5x.colorcalendar.ColorButtonBar
         android:id="@+id/colorBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"

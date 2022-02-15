@@ -282,7 +282,7 @@ class ColorPickerBar : ConstraintLayout {
     var onValueChanged: (value: Float, color: Int) -> Unit = { _, _ ->  }
 
     init {
-        LayoutInflater.from(context).inflate(R.layout.color_picker_view, this, true)
+        LayoutInflater.from(context).inflate(R.layout.color_picker_bar, this, true)
 
         colorRect = findViewById(R.id.colorRect)
         colorBar = findViewById(R.id.colorSeekBar)
@@ -309,6 +309,65 @@ class ColorPickerBar : ConstraintLayout {
 
     fun showFullHue() {
         colorBar.setShowFullHue()
+        updateColorRect()
+    }
+
+    fun setTypeFlags(typeFlags: Int) {
+        colorBar.typeFlags = typeFlags
+        updateColorRect()
+    }
+
+    fun setIsLinear(value: Boolean) {
+        colorBar.isLinear = value
+        updateColorRect()
+    }
+}
+
+// ColorPickerBar with a button for the color rect
+class ColorButtonBar : ConstraintLayout {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    private var colorRect: ColorRectButton
+    private var colorBar: ColorSeekBar2
+
+    var onValueChanged: (value: Float, color: Int) -> Unit = { _, _ ->  }
+    var onClick: () -> Unit = { }
+
+    var forcedColor: Int? = null
+
+    init {
+        LayoutInflater.from(context).inflate(R.layout.color_button_bar, this, true)
+
+        colorRect = findViewById(R.id.colorRect)
+        colorBar = findViewById(R.id.colorSeekBar)
+        colorBar.onValueChanged = { value, color ->
+            updateColorRect()
+            onValueChanged(value, color)
+        }
+        colorRect.setOnClickListener {
+            onClick()
+        }
+
+        updateColorRect()
+    }
+
+    private fun updateColorRect() {
+        forcedColor = null
+        colorRect.color = getColor()
+    }
+
+    fun getNormProgress(): Float = colorBar.getNormProgress()
+    fun setNormProgress(t: Float) = colorBar.setNormProgress(t)
+
+    fun setForcedColor(color: Int) {
+        forcedColor = color
+        colorRect.color = color
+    }
+    fun getColor() = forcedColor ?: colorBar.getColor()
+
+    fun setColors(startColor: Int, endColor: Int) {
+        colorBar.setColors(startColor, endColor)
         updateColorRect()
     }
 

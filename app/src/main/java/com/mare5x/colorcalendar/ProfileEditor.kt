@@ -220,7 +220,11 @@ class ColorPickerDialogFragment : DialogFragment() {
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
-        listener = context as ColorPickerListener
+        listener = if (parentFragment is ColorPickerListener) {
+            parentFragment as ColorPickerListener
+        } else {
+            context as ColorPickerListener
+        }
     }
 
     companion object {
@@ -653,7 +657,6 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
     }
 
     override fun onDateSet(view: DatePicker?, year: Int, month: Int, dayOfMonth: Int) {
-        // I don't know how to move this callback into ProfileSettingsFragment :(
         // month \in [0, 11]
         val date = Calendar.getInstance().apply {
             set(Calendar.YEAR, year)
