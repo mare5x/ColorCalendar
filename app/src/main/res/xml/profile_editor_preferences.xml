@@ -12,7 +12,8 @@
 
     <ListPreference
         app:key="profile_type"
-        app:title="Color picker type" />
+        app:title="Color picker type"
+        app:useSimpleSummaryProvider="true" />
 
     <com.mare5x.colorcalendar.ColorBarPreference
         app:key="profile_color_bar"

@@ -1,0 +1,11 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <ListPreference
+        app:key="calendar_rows"
+        app:title="Calendar rows"
+        app:entries="@array/settings_calendar_rows_array"
+        app:entryValues="@array/settings_calendar_rows_array_values"
+        app:defaultValue="-1"
+        app:useSimpleSummaryProvider="true" />
+
+</PreferenceScreen>

@@ -2,17 +2,24 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.mare5x.colorcalendar.MainActivity">
     <item
-        android:id="@+id/action_create_profile"
-        android:orderInCategory="101"
-        android:title="@string/new_profile" />
-    <item
-        android:id="@+id/action_delete_profile"
-        android:orderInCategory="102"
-        android:title="@string/delete_profile" />
-    <item
-        android:id="@+id/action_edit_profile"
-        android:orderInCategory="103"
-        android:title="@string/menu_edit_profile" />
+        android:id="@+id/action_settings"
+        android:orderInCategory="100"
+        android:title="@string/action_settings" />
+
+    <group android:id="@+id/profile_options">
+        <item
+            android:id="@+id/action_create_profile"
+            android:orderInCategory="101"
+            android:title="@string/new_profile" />
+        <item
+            android:id="@+id/action_delete_profile"
+            android:orderInCategory="102"
+            android:title="@string/delete_profile" />
+        <item
+            android:id="@+id/action_edit_profile"
+            android:orderInCategory="103"
+            android:title="@string/menu_edit_profile" />
+    </group>
 
     <group android:id="@+id/exporting">
         <item android:id="@+id/action_export"
