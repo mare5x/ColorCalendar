@@ -15,7 +15,7 @@ import java.util.*
 // https://developer.android.com/training/data-storage/sqlite#DefineContract
 object DatabaseContract {
     const val DB_NAME = "database.db"
-    const val DB_VERSION = 3
+    const val DB_VERSION = 4
 
     object ProfileEntryDB : BaseColumns {
         const val ID = BaseColumns._ID
@@ -51,6 +51,7 @@ object DatabaseContract {
         const val VALUE = "value"
         const val PROFILE_FK = "profile_id"
         const val COLOR = "color"
+        const val FLAGS = "flags"
 
         const val DB_CREATE = """
             CREATE TABLE $TABLE_NAME(
@@ -59,6 +60,7 @@ object DatabaseContract {
                 $DATE INTEGER NOT NULL,
                 $VALUE REAL NOT NULL,
                 $COLOR INTEGER
+                $FLAGS INTEGER
                 
                 FOREIGN KEY (${PROFILE_FK}) REFERENCES ${ProfileEntryDB.TABLE_NAME} ($ID)
             );
@@ -78,16 +80,25 @@ enum class ProfileType(val value: Int) {
     }
 }
 
-enum class ProfileFlag(val value: Int) {
+interface IntFlag {
+    val value: Int
+}
+
+enum class ProfileFlag(override val value: Int) : IntFlag {
     CUSTOM_BANNER(1 shl 0),
     CIRCLE_LONG(1 shl 1);  // Short or long circle for circle profile type
 }
 
-infix fun Int.hasFlag(flag: ProfileFlag): Boolean = this and flag.value > 0
-infix fun Int.hasFlagNot(flag: ProfileFlag) = !(this hasFlag flag)
-fun Int.setFlag0(flag: ProfileFlag): Int = this and flag.value.inv()
-fun Int.setFlag1(flag: ProfileFlag): Int = this or flag.value
-fun Int.setFlag(flag: ProfileFlag, b: Boolean): Int = if (b) this.setFlag1(flag) else this.setFlag0(flag)
+enum class EntryFlag(override val value: Int) : IntFlag {
+    IS_SELECTED(1 shl 0)
+}
+
+infix fun Int.hasFlag(flag: IntFlag): Boolean = this and flag.value > 0
+infix fun Int.hasFlagNot(flag: IntFlag) = !(this hasFlag flag)
+fun Int.setFlag0(flag: IntFlag): Int = this and flag.value.inv()
+fun Int.setFlag1(flag: IntFlag): Int = this or flag.value
+fun Int.setFlag(flag: IntFlag, b: Boolean): Int = if (b) this.setFlag1(flag) else this.setFlag0(flag)
+
 
 data class ProfileEntry(
     var id: Long = -1,
@@ -99,19 +110,45 @@ data class ProfileEntry(
     var creationDate: Date = Date(),
     var type: ProfileType = ProfileType.TWO_COLOR_CIRCLE,
     var flags: Int = 0  // Extra flags, as Int because I don't know what I'll need ...
-)
+) {
+    fun contentValues(): ContentValues {
+        val profileDB = DatabaseContract.ProfileEntryDB
+        return ContentValues().apply {
+            put(profileDB.PROFILE_NAME, name)
+            put(profileDB.MIN_COLOR, minColor)
+            put(profileDB.MAX_COLOR, maxColor)
+            put(profileDB.PREF_COLOR, prefColor)
+            put(profileDB.BANNER_COLOR, bannerColor)
+            put(profileDB.CREATION_DATE, creationDate.time)
+            put(profileDB.PROFILE_TYPE, type.value)
+            put(profileDB.PROFILE_FLAGS, flags)
+        }
+    }
+}
 
 data class Entry(
     var id: Long = -1,
     var profile: ProfileEntry? = null,
     var date: Date = Date(),
     var value: Float = 0f,  // Progress bar value
-    var color: Int? = null  // null or not depends on profile type: free color -> not null
+    var color: Int? = null,  // Not null if selected as a 'free' color by the user otherwise the color is determined from the min/max colors
+    var flags: Int = 0
 ) : Comparable<Entry> {
 
     // Order Entries by date
     override fun compareTo(other: Entry): Int {
         return compareValuesBy(this, other, { it.date }, { it.id }, { it.value })
+    }
+
+    fun contentValues(): ContentValues {
+        val entryDB = DatabaseContract.EntryDB
+        return ContentValues().apply {
+            put(entryDB.DATE, date.time)
+            put(entryDB.VALUE, value)
+            put(entryDB.PROFILE_FK, profile!!.id)
+            put(entryDB.COLOR, color)
+            put(entryDB.FLAGS, flags)
+        }
     }
 }
 
@@ -153,7 +190,8 @@ fun readEntry(cursor: Cursor, profile: ProfileEntry? = null): Entry {
         profile = profile,
         date = Date(cursor.getLong(cursor.getColumnIndexOrThrow(entryDB.DATE))),
         value = cursor.getFloat(cursor.getColumnIndexOrThrow(entryDB.VALUE)),
-        color = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(entryDB.COLOR))
+        color = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(entryDB.COLOR)),
+        flags = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(entryDB.FLAGS)) ?: 0
     )
     return entry
 }
@@ -266,23 +304,18 @@ class DatabaseHelper : SQLiteOpenHelper {
 
             version += 1
         }
+        if (version == 3 && version < newVersion) {
+            db.execSQL("""
+                ALTER TABLE ${entryDB.TABLE_NAME}
+                ADD COLUMN ${entryDB.FLAGS} INTEGER
+            """.trimIndent())
+        }
     }
 
     fun insertProfile(profile: ProfileEntry): Long {
         val profileDB = DatabaseContract.ProfileEntryDB
-        val values = ContentValues().apply {
-            put(profileDB.PROFILE_NAME, profile.name)
-            put(profileDB.MIN_COLOR, profile.minColor)
-            put(profileDB.MAX_COLOR, profile.maxColor)
-            put(profileDB.PREF_COLOR, profile.prefColor)
-            put(profileDB.BANNER_COLOR, profile.bannerColor)
-            put(profileDB.CREATION_DATE, profile.creationDate.time)
-            put(profileDB.PROFILE_TYPE, profile.type.value)
-            put(profileDB.PROFILE_FLAGS, profile.flags)
-        }
-
         try {
-            return writableDatabase.insertOrThrow(profileDB.TABLE_NAME, null, values)
+            return writableDatabase.insertOrThrow(profileDB.TABLE_NAME, null, profile.contentValues())
         } catch (e: Exception) {
             Log.e(TAG, "insertProfile: ", e)
         }
@@ -291,17 +324,7 @@ class DatabaseHelper : SQLiteOpenHelper {
 
     fun updateProfile(profile: ProfileEntry): Long {
         val profileDB = DatabaseContract.ProfileEntryDB
-        val values = ContentValues().apply {
-            put(profileDB.PROFILE_NAME, profile.name)
-            put(profileDB.MIN_COLOR, profile.minColor)
-            put(profileDB.MAX_COLOR, profile.maxColor)
-            put(profileDB.PREF_COLOR, profile.prefColor)
-            put(profileDB.BANNER_COLOR, profile.bannerColor)
-            put(profileDB.CREATION_DATE, profile.creationDate.time)
-            put(profileDB.PROFILE_TYPE, profile.type.value)
-            put(profileDB.PROFILE_FLAGS, profile.flags)
-        }
-        writableDatabase.update(profileDB.TABLE_NAME, values, "${profileDB.ID} = ${profile.id}", null)
+        writableDatabase.update(profileDB.TABLE_NAME, profile.contentValues(), "${profileDB.ID} = ${profile.id}", null)
         return profile.id
     }
 
@@ -322,16 +345,8 @@ class DatabaseHelper : SQLiteOpenHelper {
             throw Exception("Invalid profile id for $entry")
         }
         val entryDB = DatabaseContract.EntryDB
-
-        val values = ContentValues().apply {
-            put(entryDB.DATE, entry.date.time)
-            put(entryDB.VALUE, entry.value)
-            put(entryDB.PROFILE_FK, entry.profile!!.id)
-            put(entryDB.COLOR, entry.color)
-        }
-
         try {
-            return writableDatabase.insertOrThrow(entryDB.TABLE_NAME, null, values)
+            return writableDatabase.insertOrThrow(entryDB.TABLE_NAME, null, entry.contentValues())
         } catch (e: Exception) {
             Log.e(TAG, "insertEntry: ", e)
         }
@@ -388,13 +403,7 @@ class DatabaseHelper : SQLiteOpenHelper {
                 if (entry.profile == null || entry.profile!!.id < 0) {
                     throw Exception("Invalid profile id for $entry")
                 }
-                val values = ContentValues().apply {
-                    put(entryDB.DATE, entry.date.time)
-                    put(entryDB.VALUE, entry.value)
-                    put(entryDB.PROFILE_FK, entry.profile!!.id)
-                    put(entryDB.COLOR, entry.color)
-                }
-                writableDatabase.insertOrThrow(entryDB.TABLE_NAME, null, values)
+                writableDatabase.insertOrThrow(entryDB.TABLE_NAME, null, entry.contentValues())
             }
             writableDatabase.setTransactionSuccessful()
         } catch (e: Exception) {

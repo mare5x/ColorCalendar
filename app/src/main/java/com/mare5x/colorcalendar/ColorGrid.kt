@@ -126,7 +126,15 @@ class ColorRectAdapter(var profile: ProfileEntry) :
 
         fun bind(position: Int) {
             val day = dayPosition(position)
-            val entry = if (dayEntries[day].size > 0) dayEntries[day].last() else null
+            val entry =
+                if (dayEntries[day].size > 0) {
+                    // Display the most recent selected entry or last (default)
+                    dayEntries[day].findLast { e ->
+                        e.flags hasFlag EntryFlag.IS_SELECTED
+                    }.let {
+                        it ?: dayEntries[day].last()
+                    }
+                } else null
             rect.setColor(
                 if (entry != null) {
                     // Use the free color if set

@@ -31,13 +31,51 @@ class EntryAdapter(
 
     private val entryDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-    class EntryViewHolder(v: View) : RecyclerView.ViewHolder(v) {
-        val colorItem: ColorRect = v.findViewById(R.id.colorRect)
-        val entryText: TextView = v.findViewById(R.id.entryText)
+    // N.B. this can't be the entry id (-1 problem) or index (insertion problem)
+    var selectedItem: Entry? = null
+    var selectionChanged = false
+
+    inner class EntryViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+        private val colorItem: ColorRect = v.findViewById(R.id.colorRect)
+        private val entryText: TextView = v.findViewById(R.id.entryText)
+
+        fun bind(entry: Entry) {
+            colorItem.setColor(
+                entry.color
+                    ?: calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags))
+            entryText.text = entryDateFormat.format(entry.date)
+            itemView.isActivated = entry.flags hasFlag EntryFlag.IS_SELECTED
+            itemView.setOnClickListener {
+                selectItem(entry)
+                selectionChanged = true
+            }
+        }
     }
 
     class AdderViewHolder(v: View) : RecyclerView.ViewHolder(v) {
         val button: ImageButton = v.findViewById(R.id.addButton)
+    }
+
+    fun selectItem(entry: Entry?) {
+        selectedItem?.let { prev ->
+            prev.flags = prev.flags.setFlag0(EntryFlag.IS_SELECTED)
+            entries.indexOf(prev).let {
+                if (it != -1) notifyItemChanged(it)
+            }
+        }
+        if (entry != null) {
+            entry.flags = entry.flags.setFlag1(EntryFlag.IS_SELECTED)
+            entries.indexOf(entry).let {
+                if (it != -1) {
+                    notifyItemChanged(it)
+                    selectedItem = entry
+                } else {
+                    selectedItem = null
+                }
+            }
+        } else {
+            selectedItem = null
+        }
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -62,10 +100,7 @@ class EntryAdapter(
         when (holder) {
             is EntryViewHolder -> {
                 val entry = entries[position]
-                holder.colorItem.setColor(
-                    entry.color
-                        ?: calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags))
-                holder.entryText.text = entryDateFormat.format(entry.date)
+                holder.bind(entry)
             }
             is AdderViewHolder -> {
                 holder.button.setOnClickListener {
@@ -128,6 +163,12 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
             val dialog = EntryEditorDialog.create(profile, if (e.profile == null) null else e)
             dialog.show(childFragmentManager, "EntryEditorDialog")
         }
+        if (entries.size > 0) {
+            val entry = entries.find { e ->
+                e.flags hasFlag EntryFlag.IS_SELECTED
+            }
+            adapter.selectItem(entry ?: entries.first())
+        }
         val viewer = view.findViewById<EntryViewer>(R.id.entryViewer)
         viewer.adapter = adapter
 
@@ -162,13 +203,18 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
                 val position = viewHolder.adapterPosition
                 val entry = entries[position]
                 entries.removeAt(position)
+                val selectedItem = adapter.selectedItem
                 adapter.notifyItemRemoved(position)
+                if (entry.flags hasFlag EntryFlag.IS_SELECTED) {
+                    adapter.selectItem(entries.first())
+                }
                 entriesChanged = true
 
                 val snackbar = Snackbar.make(view, "Item removed", Snackbar.LENGTH_LONG)
                     .setAction("UNDO") {
                         entries.add(position, entry)
                         adapter.notifyItemInserted(position)
+                        adapter.selectItem(selectedItem)
                         viewer.scrollToPosition(position)
                     }
                 snackbar.show()
@@ -180,7 +226,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
     override fun onDestroy() {
         super.onDestroy()
 
-        if (entriesChanged) {
+        if (entriesChanged || adapter.selectionChanged) {
             entriesViewModel.setDayEntries(dayPosition, entries)
             entriesChanged = false
         }
@@ -189,7 +235,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
     override fun onPause() {
         super.onPause()
 
-        if (entriesChanged) {
+        if (entriesChanged || adapter.selectionChanged) {
             entriesViewModel.setDayEntries(dayPosition, entries)
             entriesChanged = false
         }
@@ -217,6 +263,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         entries.add(entry)
         entriesChanged = true
         adapter.notifyItemInserted(entries.size - 1)
+        adapter.selectItem(entry)
     }
 
     override fun onEntryConfirm(color: Int, hourOfDay: Int, minute: Int) {
@@ -230,6 +277,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         entries.add(entry)
         entriesChanged = true
         adapter.notifyItemInserted(entries.size - 1)
+        adapter.selectItem(entry)
     }
 
     companion object {
