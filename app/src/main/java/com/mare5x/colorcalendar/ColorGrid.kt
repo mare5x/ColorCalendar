@@ -151,6 +151,17 @@ class ColorRectAdapter(var profile: ProfileEntry) :
                 hsv[2] *= 0.75f
                 rect.setBorderColor(Color.HSVToColor(hsv))
             }
+
+            // Draw badge
+            if (entry != null && dayEntries[day].size > 1) {
+                val colors = dayEntries[day].filter { e -> e != entry }.map { e ->
+                    e.color
+                        ?: calcGradientColor(profile.minColor, profile.maxColor, e.value, profile.flags)
+                }.toIntArray()
+                rect.showBadge(colors)
+            } else {
+                rect.hideBadge()
+            }
         }
     }
 
