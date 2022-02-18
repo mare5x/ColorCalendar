@@ -12,15 +12,19 @@ import androidx.core.math.MathUtils.clamp
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.*
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.mare5x.colorcalendar.SettingsActivity.Companion.SETTING_BADGE_ENABLED
+import com.mare5x.colorcalendar.SettingsActivity.Companion.SETTING_CALENDAR_ROWS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
-import kotlin.collections.ArrayList
 import kotlin.math.roundToInt
 
 
@@ -153,7 +157,10 @@ class ColorRectAdapter(var profile: ProfileEntry) :
             }
 
             // Draw badge
-            if (entry != null && dayEntries[day].size > 1) {
+            val showBadge = PreferenceManager
+                .getDefaultSharedPreferences(itemView.context)
+                .getBoolean(SETTING_BADGE_ENABLED, true)
+            if (showBadge && entry != null && dayEntries[day].size > 1) {
                 val colors = dayEntries[day].filter { e -> e != entry }.map { e ->
                     e.color
                         ?: calcGradientColor(profile.minColor, profile.maxColor, e.value, profile.flags)
@@ -227,7 +234,7 @@ class ColorGrid : RecyclerView {
 
     fun updateRowCount() {
         val prefCols =
-            PreferenceManager.getDefaultSharedPreferences(context).getString("calendar_rows", "-1")!!.toInt()
+            PreferenceManager.getDefaultSharedPreferences(context).getString(SETTING_CALENDAR_ROWS, "-1")!!.toInt()
         val cols = when (prefCols) {
             -1 -> {
                 // Set the number of grid columns, so that each item is 'itemSize' pixels large.
@@ -324,6 +331,15 @@ class ColorGridFragment : Fragment() {
             }
         }
 
+        mainModel.getSettingsChanged().observe(viewLifecycleOwner) { settings ->
+            settings.forEach { key ->
+                when (key) {
+                    SETTING_CALENDAR_ROWS -> grid.updateRowCount()
+                    SETTING_BADGE_ENABLED -> adapter.notifyDataSetChanged()
+                }
+            }
+        }
+
         gridModel.getEntriesByDay().observe(viewLifecycleOwner) { entries ->
             adapter.dayEntries = entries
         }
@@ -342,12 +358,8 @@ class ColorGridFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-
         // If the app lives past midnight, the day list must be enlarged.
         ensureEntriesSize()
-
-        // In case preferences change
-        grid.updateRowCount()
     }
 
     private fun ensureEntriesSize() {

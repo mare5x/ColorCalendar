@@ -21,6 +21,8 @@ import androidx.core.view.MenuCompat
 import androidx.lifecycle.*
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.mare5x.colorcalendar.SettingsActivity.Companion.SETTINGS_CHANGED
+import com.mare5x.colorcalendar.SettingsActivity.Companion.SETTINGS_CODE
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -66,6 +68,8 @@ class MainViewModel(val db: DatabaseHelper) : ViewModel() {
     private val showScrollFabEvent = MutableLiveData<Event<Boolean>>()
     private val scrollFabClickedEvent = MutableLiveData<Event<Long>>()
 
+    private val settingsChanged = MutableLiveData<Array<String>>()
+
     fun getCurrentProfile() = currentProfile
     fun setCurrentProfile(profile: ProfileEntry) {
         currentProfile.postValue(profile)
@@ -102,6 +106,11 @@ class MainViewModel(val db: DatabaseHelper) : ViewModel() {
     fun getScrollFabClickedEvent() = scrollFabClickedEvent
     fun scrollFabClicked() {
         scrollFabClickedEvent.value = Event(currentProfile.value?.id ?: -1L)
+    }
+
+    fun getSettingsChanged() = settingsChanged
+    fun setSettingsChanged(settings: Array<String>) {
+        settingsChanged.postValue(settings)
     }
 }
 
@@ -266,7 +275,7 @@ class MainActivity : AppCompatActivity(),
         return when (item.itemId) {
             R.id.action_settings -> {
                 val intent = Intent(this, SettingsActivity::class.java)
-                startActivity(intent)
+                startActivityForResult(intent, SETTINGS_CODE)
                 true
             }
             R.id.action_create_profile -> {
@@ -313,29 +322,40 @@ class MainActivity : AppCompatActivity(),
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == PROFILE_EDITOR_CODE) {
-            if (resultCode == RESULT_OK) {
-                val bundle = data?.extras
-                if (bundle != null) {
-                    val profileId = bundle.getLong(ProfileEditorActivity.PROFILE_ID_KEY)
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        val profile = db.queryProfile(profileId)
-                        when (bundle.getString(ProfileEditorActivity.PROFILE_EDIT_MSG_KEY)) {
-                            "created" -> mainViewModel.insertProfile(profile)
-                            "updated" -> mainViewModel.updateProfile(profile)
+        when (requestCode) {
+            PROFILE_EDITOR_CODE -> {
+                if (resultCode == RESULT_OK) {
+                    val bundle = data?.extras
+                    if (bundle != null) {
+                        val profileId = bundle.getLong(ProfileEditorActivity.PROFILE_ID_KEY)
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val profile = db.queryProfile(profileId)
+                            when (bundle.getString(ProfileEditorActivity.PROFILE_EDIT_MSG_KEY)) {
+                                "created" -> mainViewModel.insertProfile(profile)
+                                "updated" -> mainViewModel.updateProfile(profile)
+                            }
                         }
                     }
                 }
             }
-        } else if (requestCode == EXPORT_CODE) {
-            if (resultCode == RESULT_OK) {
-                val uri = data?.data
-                exportDatabase(uri)
+            EXPORT_CODE -> {
+                if (resultCode == RESULT_OK) {
+                    val uri = data?.data
+                    exportDatabase(uri)
+                }
             }
-        } else if (requestCode == IMPORT_CODE) {
-            if (resultCode == RESULT_OK) {
-                val uri = data?.data
-                startImportDatabase(uri)
+            IMPORT_CODE -> {
+                if (resultCode == RESULT_OK) {
+                    val uri = data?.data
+                    startImportDatabase(uri)
+                }
+            }
+            SETTINGS_CODE -> {
+                if (resultCode == RESULT_OK) {
+                    data?.extras?.getStringArray(SETTINGS_CHANGED)?.let {
+                        mainViewModel.setSettingsChanged(it)
+                    }
+                }
             }
         }
     }

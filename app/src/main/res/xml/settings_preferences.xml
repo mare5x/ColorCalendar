@@ -1,4 +1,5 @@
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
     <ListPreference
         app:key="calendar_rows"
@@ -7,5 +8,12 @@
         app:entryValues="@array/settings_calendar_rows_array_values"
         app:defaultValue="-1"
         app:useSimpleSummaryProvider="true" />
+
+    <CheckBoxPreference
+        app:key="badge_enabled"
+        app:title="Show badge"
+        app:summary="Display an indicator if a date has multiple entries"
+        android:defaultValue="true"
+        />
 
 </PreferenceScreen>
