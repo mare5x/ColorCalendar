@@ -59,8 +59,8 @@ object DatabaseContract {
                 $PROFILE_FK INTEGER NOT NULL,
                 $DATE INTEGER NOT NULL,
                 $VALUE REAL NOT NULL,
-                $COLOR INTEGER
-                $FLAGS INTEGER
+                $COLOR INTEGER,
+                $FLAGS INTEGER,
                 
                 FOREIGN KEY (${PROFILE_FK}) REFERENCES ${ProfileEntryDB.TABLE_NAME} ($ID)
             );
