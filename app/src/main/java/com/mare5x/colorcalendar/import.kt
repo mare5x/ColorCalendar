@@ -9,7 +9,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -123,11 +122,11 @@ class ImportDialog : DialogFragment() {
         fun onImport()
     }
 
+    private lateinit var db: DatabaseHelper
     private lateinit var adapter: ImportAdapter
-    private val mainModel: MainViewModel by activityViewModels()
     private val viewModel: ImportViewModel by viewModels {
         val importPath = requireArguments().getString(IMPORT_PATH_KEY)!!
-        ImportViewModelFactory(importPath, mainModel.db, requireContext())
+        ImportViewModelFactory(importPath, db, requireContext())
     }
 
     private var listener: ImportDialogListener? = null
@@ -142,6 +141,8 @@ class ImportDialog : DialogFragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        db = DatabaseHelper(requireContext())
+
         super.onViewCreated(view, savedInstanceState)
 
         adapter = ImportAdapter(viewModel.profilesToImport, viewModel.entriesToImport)
@@ -157,7 +158,6 @@ class ImportDialog : DialogFragment() {
 
         val confirmButton = view.findViewById<Button>(R.id.confirmButton)
         confirmButton.setOnClickListener {
-            val db = mainModel.db
             viewModel.profilesToImport.forEachIndexed { index, profile ->
                 if (profile.id == -1L) {
                     profile.id = db.insertProfile(profile)
@@ -176,6 +176,11 @@ class ImportDialog : DialogFragment() {
 
             listener?.onImport()
         }
+    }
+
+    override fun onDestroy() {
+        db.close()
+        super.onDestroy()
     }
 
     override fun onAttach(context: Context) {

@@ -127,9 +127,8 @@ class MainViewModelFactory(private val db: DatabaseHelper) : ViewModelProvider.F
 
 class MainActivity : AppCompatActivity(),
     EntryEditorDialog.EntryEditorListener,
-    ProfileDeleteDialog.ProfileDeleteListener,
-    ImportDialog.ImportDialogListener {
-
+    ProfileDeleteDialog.ProfileDeleteListener
+{
     private lateinit var db: DatabaseHelper
     private lateinit var viewPager: ViewPager2
 
@@ -278,6 +277,7 @@ class MainActivity : AppCompatActivity(),
         // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
             R.id.action_settings -> {
+                db.close()  // commit (possible import/export)
                 val intent = Intent(this, SettingsActivity::class.java)
                 startActivityForResult(intent, SETTINGS_CODE)
                 true
@@ -303,23 +303,6 @@ class MainActivity : AppCompatActivity(),
                 startActivityForResult(intent, PROFILE_EDITOR_CODE)
                 true
             }
-            R.id.action_export -> {
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "*/*"
-                    putExtra(Intent.EXTRA_TITLE, "colorcalendar-backup.db")
-                }
-                startActivityForResult(intent, EXPORT_CODE)
-                true
-            }
-            R.id.action_import -> {
-                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "*/*"
-                }
-                startActivityForResult(intent, IMPORT_CODE)
-                true
-            }
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -340,18 +323,6 @@ class MainActivity : AppCompatActivity(),
                             }
                         }
                     }
-                }
-            }
-            EXPORT_CODE -> {
-                if (resultCode == RESULT_OK) {
-                    val uri = data?.data
-                    exportDatabase(uri)
-                }
-            }
-            IMPORT_CODE -> {
-                if (resultCode == RESULT_OK) {
-                    val uri = data?.data
-                    startImportDatabase(uri)
                 }
             }
             SETTINGS_CODE -> {
@@ -378,44 +349,6 @@ class MainActivity : AppCompatActivity(),
         supportActionBar?.setBackgroundDrawable(ColorDrawable(color))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.statusBarColor = dimColor(color, 0.8f)
-        }
-    }
-    
-    private fun exportDatabase(uri: Uri?) {
-        if (uri == null) {
-            Toast.makeText(applicationContext, "Failed to export!", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        db.close()  // Commit changes
-        val src = File(db.writableDatabase.path)
-        val out = contentResolver.openOutputStream(uri)
-        if (out != null) {
-            src.inputStream().copyTo(out)
-            out.flush()
-            out.close()
-
-            Toast.makeText(applicationContext, "Exported successfully!", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun startImportDatabase(uri: Uri?) {
-        uri ?: return
-
-        // Copy file to internal storage
-        applicationContext.openFileOutput("import.db", Context.MODE_PRIVATE).use { dst ->
-            val src = contentResolver.openInputStream(uri)
-            src?.copyTo(dst)
-            dst.flush()
-            dst.close()
-        }
-        val importPath = applicationContext.getFileStreamPath("import.db").absolutePath
-
-        if (isValidDatabaseFile(importPath)) {
-            val dialog = ImportDialog.create(importPath)
-            dialog.show(supportFragmentManager, "importDialog")
-        } else {
-            Toast.makeText(applicationContext, "Import error!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -464,21 +397,9 @@ class MainActivity : AppCompatActivity(),
         mainViewModel.insertEntry(entry)
     }
 
-    override fun onImport() {
-        // Restart app to update state ...
-        finish()
-        startActivity(getIntent())
-
-        // profilesViewModel.fetchProfiles()
-        // viewModelStore.clear()
-        // recreate()
-    }
-
     companion object {
         private const val TAG = "MainActivity"
         private const val PROFILE_EDITOR_CODE = 42
-        private const val EXPORT_CODE = 69
-        private const val IMPORT_CODE = 70
     }
 }
 

@@ -21,14 +21,4 @@
             android:title="@string/menu_edit_profile" />
     </group>
 
-    <group android:id="@+id/exporting">
-        <item android:id="@+id/action_export"
-            android:orderInCategory="104"
-            android:title="@string/menu_export" />
-
-        <item android:id="@+id/action_import"
-            android:orderInCategory="105"
-            android:title="@string/menu_import" />
-    </group>
-
 </menu>

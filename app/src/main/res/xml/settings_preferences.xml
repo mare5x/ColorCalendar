@@ -16,4 +16,18 @@
         android:defaultValue="true"
         />
 
+    <PreferenceCategory>
+
+        <Preference
+            app:key="import_setting"
+            app:title="Import data"
+            app:summary="Import previously exported data" />
+
+        <Preference
+            app:key="export_setting"
+            app:title="Export data"
+            app:summary="Export data to device" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>
