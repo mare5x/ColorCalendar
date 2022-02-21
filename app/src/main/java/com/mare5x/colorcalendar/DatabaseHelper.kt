@@ -71,8 +71,8 @@ object DatabaseContract {
 
 enum class ProfileType(val value: Int) {
     TWO_COLOR_CIRCLE(0),  // 0 must be default for old database compatibility
-    FREE_COLOR(1);
-//    ONE_COLOR_SHADE(2),
+    FREE_COLOR(1),
+    ONE_COLOR_HSV(2);
 //    BOOLEAN_COLOR(3);
 
     companion object {

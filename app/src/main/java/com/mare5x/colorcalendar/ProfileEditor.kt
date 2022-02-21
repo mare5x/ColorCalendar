@@ -23,6 +23,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.preference.*
 import com.mare5x.colorcalendar.databinding.DialogColorPickerBinding
+import com.mare5x.colorcalendar.databinding.DialogHsvRectBinding
 import com.mare5x.colorcalendar.databinding.DialogTwoColorPickerBinding
 import com.mare5x.colorcalendar.databinding.ProfileEditorActivityBinding
 import java.text.DateFormat
@@ -339,6 +340,107 @@ class TwoColorPickerFragment : DialogFragment() {
     }
 }
 
+class HSVRectFragment : DialogFragment() {
+    interface ColorPickerListener {
+        // Need barValue because colorToHSV can lose information
+        fun onColorConfirm(colors: List<Int>, barColor: Int, barValue: Float)
+    }
+
+    private lateinit var listener: ColorPickerListener
+    private var _binding: DialogHsvRectBinding? = null
+    private val binding get() = _binding!!
+
+    private val hsvs: List<FloatArray> = listOf(floatArrayOf(0f, 1f, 1f), floatArrayOf(0.25f, 1f, 1f))
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        _binding = DialogHsvRectBinding.inflate(inflater, container, false)
+        return _binding?.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        requireArguments().let {
+            it.getIntArray(COLORS_KEY)?.forEachIndexed { i, color ->
+                Color.colorToHSV(color, hsvs[i])
+            }
+            binding.colorBar.setNormProgress(it.getFloat(BAR_VALUE_KEY))
+        }
+
+        // Given the two thumb colors -> hue must be the same
+        // Note: problem finding the correct hue if both colors are near (s,v)=(0,0) (hue information is lost
+        // by colorToHSV)!  TODO
+        val hue = hsvs.maxOf { it[0] }
+        hsvs.forEach { it[0] = hue }
+        binding.hsvRect.setMainColor(Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+        hsvs.forEachIndexed { i, hsv ->
+            binding.hsvRect.setThumbColor(i, Color.HSVToColor(hsv))
+        }
+        binding.hsvRect.onValueChanged = { thumbs ->
+            hsvs.forEachIndexed { i, hsv ->
+                hsv[1] = thumbs[i].xProgress
+                hsv[2] = thumbs[i].yProgress
+            }
+            updateBarColors()
+        }
+        binding.hueBar.setShowFullHue()
+        binding.hueBar.setNormProgress(hue / 360f)
+        binding.hueBar.onValueChanged = { _, c ->
+            val hsv = floatArrayOf(0f, 0f, 0f)
+            Color.colorToHSV(c, hsv)
+            hsvs.forEach { it[0] = hsv[0] }
+            binding.hsvRect.setMainColor(c)
+            updateBarColors()
+        }
+
+        binding.colorBar.setIsLinear(true)
+
+        binding.cancelButton.setOnClickListener {
+            if (showsDialog)
+                dismiss()
+        }
+        binding.confirmButton.setOnClickListener {
+            listener.onColorConfirm(hsvs.map { Color.HSVToColor(it) }, binding.colorBar.getColor(), binding.colorBar.getNormProgress())
+            if (showsDialog)
+                dismiss()
+        }
+
+        updateBarColors()
+    }
+
+    private fun updateBarColors() {
+        binding.colorBar.setColors(Color.HSVToColor(hsvs[0]), Color.HSVToColor(hsvs[1]))
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        listener = context as ColorPickerListener
+    }
+
+    companion object {
+        private const val COLORS_KEY = "colors_key"
+        private const val BAR_VALUE_KEY = "bar_value"
+
+        fun create(colors: IntArray, barValue: Float): HSVRectFragment {
+            val fragment = HSVRectFragment()
+            fragment.arguments = Bundle().apply {
+                putIntArray(COLORS_KEY, colors)
+                putFloat(BAR_VALUE_KEY, barValue)
+            }
+            return fragment
+        }
+    }
+}
+
 
 class ProfileEditorViewModel(var profileId: Long, db: DatabaseHelper) : ViewModel() {
     // var profileId = -1L
@@ -373,7 +475,7 @@ class ProfileEditorViewModel(var profileId: Long, db: DatabaseHelper) : ViewMode
         profileType.value = profile.type
         profileFlags.value = profile.flags
 
-        prefBarProgress = calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.flags)
+        prefBarProgress = calcGradientProgress(profile)
     }
 
     fun makeProfile(): ProfileEntry {
@@ -451,8 +553,9 @@ class ColorBarPreference : Preference {
         super.onBindViewHolder(holder)
         colorBar = holder.itemView.findViewById(R.id.colorBar)
         val viewModel = (preferenceDataStore as ProfileEditorDataStore).model
-        colorBar?.setColors(viewModel.minColor.value!!, viewModel.maxColor.value!!)
+        colorBar?.isLinear = viewModel.profileType.value!! == ProfileType.ONE_COLOR_HSV
         colorBar?.typeFlags = viewModel.profileFlags.value!!
+        colorBar?.setColors(viewModel.minColor.value!!, viewModel.maxColor.value!!)
         colorBar?.setNormProgress(viewModel.prefBarProgress)
         // Must be set last
         colorBar?.onValueChanged = { t, color ->
@@ -462,11 +565,10 @@ class ColorBarPreference : Preference {
     }
 
     fun update(viewModel: ProfileEditorViewModel) {
-        colorBar?.setColors(viewModel.minColor.value!!, viewModel.maxColor.value!!)
+        colorBar?.isLinear = viewModel.profileType.value!! == ProfileType.ONE_COLOR_HSV
         colorBar?.typeFlags = viewModel.profileFlags.value!!
-        colorBar?.setNormProgress(
-            calcGradientProgress(viewModel.minColor.value!!, viewModel.maxColor.value!!,
-                viewModel.prefColor.value!!, viewModel.profileFlags.value!!))
+        colorBar?.setColors(viewModel.minColor.value!!, viewModel.maxColor.value!!)
+        colorBar?.setNormProgress(viewModel.prefBarProgress)
     }
 }
 
@@ -505,14 +607,21 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
         val colorBarPreference = findPreference<ColorBarPreference>("profile_color_bar")!!
         colorBarPreference.setOnPreferenceClickListener {
             val colors = intArrayOf(viewModel.minColor.value!!, viewModel.maxColor.value!!)
-            TwoColorPickerFragment
-                .create(colors, viewModel.profileFlags.value ?: 0, viewModel.prefBarProgress)
-                .show(childFragmentManager, "colorPicker")
+            when (viewModel.profileType.value!!) {
+                ProfileType.TWO_COLOR_CIRCLE ->
+                    TwoColorPickerFragment
+                        .create(colors, viewModel.profileFlags.value ?: 0, viewModel.prefBarProgress)
+                        .show(childFragmentManager, "colorPicker")
+                ProfileType.ONE_COLOR_HSV ->
+                    HSVRectFragment
+                        .create(colors, viewModel.prefBarProgress)
+                        .show(childFragmentManager, "colorPicker")
+                else -> error("colorBarPreference profile type")
+            }
             true
         }
 
         val profileTypePreference = findPreference<ListPreference>("profile_type")!!
-        profileTypePreference.setEntries(R.array.profile_types_array)
         profileTypePreference.entryValues = ProfileType.values().map { it.name }.toTypedArray()
 
         viewModel.name.observe(viewLifecycleOwner) { profileName ->
@@ -530,28 +639,67 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
         viewModel.maxColor.observe(viewLifecycleOwner) {
             colorBarPreference.update(viewModel)
         }
-        viewModel.profileFlags.observe(viewLifecycleOwner) { flags ->
-            colorBarPreference.update(viewModel)
-            profileBannerColorFlag.isChecked = flags hasFlag ProfileFlag.CUSTOM_BANNER
-        }
         viewModel.prefColor.observe(viewLifecycleOwner) { color ->
             if (viewModel.bannerColor.value == null) {
                 profileBannerColor.icon = ColorRectDrawable(color)
             }
         }
+        viewModel.profileFlags.observe(viewLifecycleOwner) { flags ->
+            colorBarPreference.update(viewModel)
+            profileBannerColorFlag.isChecked = flags hasFlag ProfileFlag.CUSTOM_BANNER
+        }
         viewModel.profileType.observe(viewLifecycleOwner) { type ->
+            // TODO
+            // For now, the profile will support persisting only min/max/prefColors for one profile type...
             profileTypePreference.value = type.name
             when (type) {
-                ProfileType.TWO_COLOR_CIRCLE -> colorBarPreference.isVisible = true
+                ProfileType.TWO_COLOR_CIRCLE -> {
+                    // Set color constraints (same saturation and value)
+                    val minHSV = viewModel.minColor.value!!.toHSV()
+                    val maxHSV = viewModel.maxColor.value!!.toHSV()
+                    val prefHSV = viewModel.prefColor.value!!.toHSV()
+                    // TODO bug? if minColor is close to black, the hue part gets lost in conversion and it becomes 0 -> red
+                    prefHSV[2] = 1f  // value
+                    minHSV[1] = prefHSV[1]  // saturation
+                    minHSV[2] = prefHSV[2]
+                    maxHSV[1] = prefHSV[1]
+                    maxHSV[2] = prefHSV[2]
+                    viewModel.minColor.value = Color.HSVToColor(minHSV)
+                    viewModel.maxColor.value = Color.HSVToColor(maxHSV)
+                    viewModel.prefColor.value = Color.HSVToColor(prefHSV)
+
+                    colorBarPreference.isVisible = true
+                    colorBarPreference.update(viewModel)
+                }
                 ProfileType.FREE_COLOR -> {
                     colorBarPreference.isVisible = false
+                }
+                ProfileType.ONE_COLOR_HSV -> {
+                    // Set color constraints (same hue)
+                    val minHSV = viewModel.minColor.value!!.toHSV()
+                    val maxHSV = viewModel.maxColor.value!!.toHSV()
+                    val prefHSV = viewModel.prefColor.value!!.toHSV()
+                    maxHSV[0] = prefHSV[0]
+                    minHSV[0] = prefHSV[0]  // hue
+                    viewModel.minColor.value = Color.HSVToColor(minHSV)
+                    viewModel.maxColor.value = Color.HSVToColor(maxHSV)
+                    viewModel.prefColor.value = Color.HSVToColor(prefHSV)
+
+                    colorBarPreference.isVisible = true
+                    colorBarPreference.update(viewModel)
                 }
             }
         }
     }
 }
 
-class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileDiscardListener, DatePickerDialog.OnDateSetListener, ColorPickerDialogFragment.ColorPickerListener, TwoColorPickerFragment.ColorPickerListener {
+class ProfileEditorActivity : AppCompatActivity(),
+    ProfileDiscardDialog.ProfileDiscardListener,
+    DatePickerDialog.OnDateSetListener,
+    ColorPickerDialogFragment.ColorPickerListener,
+    TwoColorPickerFragment.ColorPickerListener,
+    HSVRectFragment.ColorPickerListener
+{
     private lateinit var binding: ProfileEditorActivityBinding
     private lateinit var db: DatabaseHelper
     private val viewModel: ProfileEditorViewModel by viewModels()
@@ -711,6 +859,17 @@ class ProfileEditorActivity : AppCompatActivity(), ProfileDiscardDialog.ProfileD
         viewModel.maxColor.value = colors[1]
         viewModel.prefColor.value = barColor
         viewModel.profileFlags.value = typeFlags
+        viewModel.prefBarProgress = calcGradientProgress(viewModel.makeProfile())
+        viewModel.maxColor.value = colors[1]  // stupid hack to trigger livedata update
+    }
+
+    override fun onColorConfirm(colors: List<Int>, barColor: Int, barValue: Float) {
+        // HSV rect picker callback
+        viewModel.minColor.value = colors[0]
+        viewModel.maxColor.value = colors[1]
+        viewModel.prefColor.value = barColor
+        viewModel.prefBarProgress = barValue
+        viewModel.maxColor.value = colors[1]  // stupid hack to trigger livedata update
     }
 
     companion object {

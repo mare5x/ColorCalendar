@@ -18,7 +18,11 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.math.MathUtils.clamp
 import androidx.core.view.MenuCompat
-import androidx.lifecycle.*
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.mare5x.colorcalendar.SettingsActivity.Companion.SETTINGS_CHANGED
@@ -438,7 +442,8 @@ class MainActivity : AppCompatActivity(),
         val entry = Entry(
             profile = currentProfile,
             value = value,
-            date = t.time
+            date = t.time,
+            flags = EntryFlag.IS_SELECTED.value
         )
         mainViewModel.insertEntry(entry)
     }
@@ -453,7 +458,8 @@ class MainActivity : AppCompatActivity(),
             profile = currentProfile,
             value = 1f,
             date = t.time,
-            color = color
+            color = color,
+            flags = EntryFlag.IS_SELECTED.value
         )
         mainViewModel.insertEntry(entry)
     }

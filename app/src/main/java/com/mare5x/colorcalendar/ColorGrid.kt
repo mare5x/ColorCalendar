@@ -142,8 +142,7 @@ class ColorRectAdapter(var profile: ProfileEntry) :
             rect.setColor(
                 if (entry != null) {
                     // Use the free color if set
-                    entry.color
-                        ?: calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags)
+                    entry.color ?: calcGradientColor(profile, entry.value)
                 }
                 else Color.GRAY
             )
@@ -162,8 +161,7 @@ class ColorRectAdapter(var profile: ProfileEntry) :
                 .getBoolean(SETTING_BADGE_ENABLED, true)
             if (showBadge && entry != null && dayEntries[day].size > 1) {
                 val colors = dayEntries[day].filter { e -> e != entry }.map { e ->
-                    e.color
-                        ?: calcGradientColor(profile.minColor, profile.maxColor, e.value, profile.flags)
+                    e.color ?: calcGradientColor(profile, e.value)
                 }.toIntArray()
                 rect.showBadge(colors)
             } else {

@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Parcel
 import android.os.Parcelable
 import android.util.AttributeSet
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.MotionEvent.INVALID_POINTER_ID
@@ -18,8 +19,10 @@ import android.widget.SeekBar
 import androidx.appcompat.widget.AppCompatSeekBar
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.graphics.blue
+import androidx.core.graphics.contains
 import androidx.core.graphics.green
 import androidx.core.graphics.red
+import androidx.core.math.MathUtils
 import kotlin.math.*
 
 // TODO pick a shade of a single color
@@ -76,6 +79,11 @@ val Int.hue: Float
         return hsv[0]
     }
 
+fun Int.toHSV(): FloatArray {
+    val hsv = FloatArray(3)
+    Color.colorToHSV(this, hsv)
+    return hsv
+}
 
 fun dimColor(color: Int, dim: Float) : Int {
     val hsv = FloatArray(3)
@@ -92,10 +100,8 @@ fun mixColors(c0: Int, c1: Int, t: Float): Int {
 }
 
 fun calcGradientColor(startColor: Int, endColor: Int, t: Float, typeFlags: Int = 0) : Int {
-    val hsv1 = floatArrayOf(0f, 0f, 0f)
-    val hsv2 = floatArrayOf(0f, 0f, 0f)
-    Color.RGBToHSV(startColor.red, startColor.green, startColor.blue, hsv1)
-    Color.RGBToHSV(endColor.red, endColor.green, endColor.blue, hsv2)
+    val hsv1 = startColor.toHSV()
+    val hsv2 = endColor.toHSV()
     val (h0, h1) = correctDistanceAngles(hsv1[0], hsv2[0], typeFlags)
     val h = ((1.0f - t) * h0 + t * h1).mod(360f)
     val s = (1.0f - t) * hsv1[1] + t * hsv2[1]
@@ -104,23 +110,48 @@ fun calcGradientColor(startColor: Int, endColor: Int, t: Float, typeFlags: Int =
     return Color.HSVToColor(hsv)
 }
 
-fun calcGradientProgress(startColor: Int, endColor: Int, midColor: Int, typeFlags: Int) : Float {
-    // Assume startColor and endColor have the same Saturation and Value.
+fun calcGradientColor(profile: ProfileEntry, t: Float): Int {
+    return when (profile.type) {
+        ProfileType.TWO_COLOR_CIRCLE -> calcGradientColor(profile.minColor, profile.maxColor, t, profile.flags)
+        ProfileType.FREE_COLOR -> profile.bannerColor ?: profile.prefColor
+        ProfileType.ONE_COLOR_HSV -> mixColors(profile.minColor, profile.maxColor, t)
+    }
+}
+
+fun calcGradientProgress(profile: ProfileEntry) : Float {
     val hsvStart = FloatArray(3)
     val hsvEnd = FloatArray(3)
     val hsvMid = FloatArray(3)
-    Color.colorToHSV(startColor, hsvStart)
-    Color.colorToHSV(endColor, hsvEnd)
-    Color.colorToHSV(midColor, hsvMid)
+    Color.colorToHSV(profile.minColor, hsvStart)
+    Color.colorToHSV(profile.maxColor, hsvEnd)
+    Color.colorToHSV(profile.prefColor, hsvMid)
+    when (profile.type) {
+        ProfileType.TWO_COLOR_CIRCLE -> {
+            // Assume startColor and endColor have the same Saturation and Value.
+            // TODO check correctness? Consider profile type!
+            val (a, b) = correctDistanceAngles(hsvStart[0], hsvEnd[0], profile.flags)
+            if (hsvMid[0] in a..b || hsvMid[0] in b..a) {
+                return abs(hsvMid[0] - a) / abs(b - a)
+            } else {
+                return abs(hsvMid[0] - 360f - a) / abs(b - a)
+            }
+            // return circleDistance(hsvStart[0], hsvMid[0], type) / circleDistance(hsvStart[0], hsvEnd[0], type)
+        }
+        ProfileType.ONE_COLOR_HSV -> {
+            // Rhis doesn't work properly because multiple HSVs map to the same colors (sat, val information is lost)
+            // return (hsvMid[1] - hsvStart[1]) / (hsvEnd[1] - hsvStart[1])
 
-    // TODO check correctness? Consider profile type!
-    val (a, b) = correctDistanceAngles(hsvStart[0], hsvEnd[0], typeFlags)
-    if (hsvMid[0] in a..b || hsvMid[0] in b..a) {
-        return abs(hsvMid[0] - a) / abs(b - a)
-    } else {
-        return abs(hsvMid[0] - 360f - a) / abs(b - a)
+            // Assume linear rgb interpolation.
+            if (profile.minColor.red != profile.maxColor.red) {
+                return (profile.prefColor.red - profile.minColor.red) / (profile.maxColor.red - profile.minColor.red).toFloat()
+            } else if (profile.minColor.green != profile.maxColor.green) {
+                return (profile.prefColor.green - profile.minColor.green) / (profile.maxColor.green - profile.maxColor.green).toFloat()
+            } else {
+                return (profile.prefColor.blue - profile.minColor.blue) / (profile.maxColor.blue - profile.minColor.blue).toFloat()
+            }
+        }
+        ProfileType.FREE_COLOR -> return 1f
     }
-    // return circleDistance(hsvStart[0], hsvMid[0], type) / circleDistance(hsvStart[0], hsvEnd[0], type)
 }
 
 fun hueColor(h: Float, s: Float = 1f, v: Float = 1f) = Color.HSVToColor(floatArrayOf(h * 360f, s, v))
@@ -500,7 +531,7 @@ class ThumbDrawable(accentColor: Int) : Drawable() {
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 }
 
-class BarThumb(color: Int) {
+class CircleThumb(color: Int) {
     var pointerID: Int = INVALID_POINTER_ID
     var touchPoint = PointF()
 
@@ -533,16 +564,47 @@ class BarThumb(color: Int) {
     }
 }
 
+class RectThumb(color: Int) {
+    var pointerID: Int = INVALID_POINTER_ID
+    var touchPoint = PointF()
+
+    var centerPoint = PointF()
+    var xProgress: Float = 0f  // in range [0, 1]
+    var yProgress: Float = 1f  // in range [0, 1]
+
+    var isDragging: Boolean = false
+    var radius: Float = 0f  // px units
+
+    private var drawable: Drawable = ThumbDrawable(color)
+
+    fun updatePosition(rect: RectF) {
+        centerPoint.set(
+            rect.left + xProgress * rect.width(),
+            rect.bottom - yProgress * rect.height()
+        )
+    }
+
+    fun draw(canvas: Canvas) {
+        drawable.setBounds(
+            (centerPoint.x - radius).toInt(),
+            (centerPoint.y - radius).toInt(),
+            (centerPoint.x + radius).toInt(),
+            (centerPoint.y + radius).toInt()
+        )
+        drawable.draw(canvas)
+    }
+}
+
 open class HSVCircleBar : View {
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-    var onValueChanged: (thumbs: List<BarThumb>) -> Unit = { _ ->  }
+    var onValueChanged: (thumbs: List<CircleThumb>) -> Unit = { _ ->  }
 
     protected var circleRadius: Float = 0f  // px units
     protected val centerPoint: PointF = PointF()  // local px units
 
-    protected val thumbs: MutableList<BarThumb> = mutableListOf()
+    protected val thumbs: MutableList<CircleThumb> = mutableListOf()
 
     private val huePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val saturationPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -665,14 +727,14 @@ open class HSVCircleBar : View {
     }
 
     // Closest Thumb to point that isn't being used.
-    private fun closestThumbTo(point: PointF): BarThumb? {
+    private fun closestThumbTo(point: PointF): CircleThumb? {
         return thumbs
             .filter { it.pointerID == INVALID_POINTER_ID }
             .minByOrNull { dist2(it.centerPoint, point) }
     }
 
     fun addThumb(thumbColor: Int, colorPosition: Int) {
-        val thumb = BarThumb(thumbColor)
+        val thumb = CircleThumb(thumbColor)
         thumbs.add(thumb)
         setThumbColor(thumbs.lastIndex, colorPosition)
         invalidate()
@@ -685,7 +747,7 @@ open class HSVCircleBar : View {
         }
     }
 
-    open fun handleTouch(thumb: BarThumb): Boolean {
+    open fun handleTouch(thumb: CircleThumb): Boolean {
         val (x, y) = (thumb.touchPoint.x - centerPoint.x) to (thumb.touchPoint.y - centerPoint.y)
         val phi = atan2(-y, x)
 
@@ -782,7 +844,7 @@ class HSVTwoColorBar : HSVCircleBar {
         }
     }
 
-    override fun handleTouch(thumb: BarThumb): Boolean {
+    override fun handleTouch(thumb: CircleThumb): Boolean {
         val (x, y) = (thumb.touchPoint.x - centerPoint.x) to (thumb.touchPoint.y - centerPoint.y)
         val phi = atan2(-y, x)
 
@@ -824,6 +886,268 @@ class HSVTwoColorBar : HSVCircleBar {
             drawCircle(it)
             drawThumbArc(it)
             drawThumbs(it)
+        }
+    }
+}
+
+open class HSVRectPicker : View {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
+
+    var onValueChanged: (thumbs: List<RectThumb>) -> Unit = { _ ->  }
+
+    protected val thumbs: MutableList<RectThumb> = mutableListOf()
+
+    private val satValPaint = Paint()
+    protected val trackPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        color = Color.GRAY
+        strokeWidth = 2f
+    }
+
+    private var baseColor: Int = 0
+    private var baseHsv: FloatArray = floatArrayOf(0f, 0f, 0f)
+
+    // private var padding: Float = 8f  // dp units
+    private var thumbDetectionRadius: Float = 4f  // dp units
+    private var thumbRadius: Float = 0f  // set in onSizeChanged, pixel units
+
+    init {
+        // https://developer.android.com/guide/topics/graphics/hardware-accel
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+
+        addThumb(Color.RED, Color.HSVToColor(floatArrayOf(0f, 0.5f, 0.5f)))
+        addThumb(Color.GREEN, Color.HSVToColor(floatArrayOf(0f, 1f, 1f)))
+        setMainColor(Color.GREEN)
+    }
+
+    private fun drawingRect(): RectF {
+        val r = thumbRadius
+        return RectF(
+            max(paddingLeft.toFloat(), r),
+            max(paddingTop.toFloat(), r),
+            width - max(paddingRight.toFloat(), r),
+            height - max(paddingBottom.toFloat(), r)
+        )
+    }
+
+    private fun drawConnector(canvas: Canvas) {
+        val t0 = thumbs[0]
+        val t1 = thumbs[1]
+        canvas.drawLine(t0.centerPoint.x, t0.centerPoint.y, t1.centerPoint.x, t1.centerPoint.y, trackPaint)
+    }
+
+    private fun drawRect(canvas: Canvas) {
+        val rect = drawingRect()
+        canvas.drawRect(rect, satValPaint)
+    }
+
+    private fun drawThumbs(canvas: Canvas) {
+        thumbs.forEach { thumb -> thumb.draw(canvas) }
+    }
+
+    override fun onDraw(canvas: Canvas?) {
+        canvas?.let{
+            drawRect(it)
+            if (thumbs.size > 1) {
+                drawConnector(it)
+            }
+            drawThumbs(it)
+        }
+    }
+
+    private fun updateShader() {
+        val rect = drawingRect()
+        val saturationShader = LinearGradient(
+            rect.left, rect.top, rect.right, rect.top,
+            Color.WHITE, baseColor,
+            Shader.TileMode.CLAMP
+        )
+        val valueShader = LinearGradient(
+            rect.left, rect.top, rect.left, rect.bottom,
+            Color.WHITE, -16777216,
+            Shader.TileMode.CLAMP
+        )
+        // NOTE: https://developer.android.com/guide/topics/graphics/hardware-accel
+        // Same type shaders inside ComposeShader are not supported until API 28!!!
+        satValPaint.shader = ComposeShader(valueShader, saturationShader, PorterDuff.Mode.MULTIPLY)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+
+        thumbRadius = 12f * resources.displayMetrics.density
+        val rect = drawingRect()
+        updateShader()
+        thumbs.forEach {
+            it.radius = thumbRadius
+            it.updatePosition(rect)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        return when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                var touchHandled = false
+                // val detectionRadius = thumbDetectionRadius * resources.displayMetrics.density + thumbRadius
+
+                val pointerIndex = event.actionIndex
+                val pointerID = event.getPointerId(pointerIndex)
+
+                val touchPoint = PointF(event.getX(pointerIndex), event.getY(pointerIndex))
+                val detectionRect = RectF(0f, 0f, width.toFloat(), height.toFloat()) // Whole view
+                if (detectionRect.contains(touchPoint)) {
+                    performClick()
+                    val thumb = closestThumbTo(touchPoint)
+                    if (thumb != null) {
+                        thumb.pointerID = pointerID
+                        thumb.touchPoint = touchPoint
+                        thumb.isDragging = true
+                        touchHandled = handleTouch(thumb) || touchHandled
+                    }
+                }
+                touchHandled
+            }
+            MotionEvent.ACTION_MOVE -> {
+                var touchHandled = false
+                for (thumb in thumbs) {
+                    if (thumb.pointerID != INVALID_POINTER_ID) {
+                        event.findPointerIndex(thumb.pointerID).let { index ->
+                            if (index != INVALID_POINTER_ID) {
+                                thumb.touchPoint.set(event.getX(index), event.getY(index))
+                                touchHandled = handleTouch(thumb) || touchHandled
+                            }
+                        }
+                    }
+                }
+                true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                for (thumb in thumbs) {
+                    thumb.pointerID = INVALID_POINTER_ID
+                    thumb.isDragging = false
+                }
+                true
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val pointerIndex = event.actionIndex
+                val pointerID = event.getPointerId(pointerIndex)
+                for (thumb in thumbs) {
+                    if (thumb.pointerID != INVALID_POINTER_ID && thumb.pointerID == pointerID) {
+                        thumb.pointerID = INVALID_POINTER_ID
+                        thumb.isDragging = false
+                    }
+                }
+                true
+            }
+            else -> super.onTouchEvent(event)
+        }
+    }
+
+    // Closest Thumb to point that isn't being used.
+    private fun closestThumbTo(point: PointF): RectThumb? {
+        return thumbs
+            .filter { it.pointerID == INVALID_POINTER_ID }
+            .minByOrNull { dist2(it.centerPoint, point) }
+    }
+
+    fun addThumb(thumbColor: Int, colorPosition: Int) {
+        val thumb = RectThumb(thumbColor)
+        thumbs.add(thumb)
+        setThumbColor(thumbs.lastIndex, colorPosition)
+        invalidate()
+    }
+
+    fun removeThumb() {
+        if (thumbs.isNotEmpty()) {
+            thumbs.removeLast()
+            invalidate()
+        }
+    }
+
+    open fun handleTouch(thumb: RectThumb): Boolean {
+        val rect = drawingRect()
+        thumb.xProgress = MathUtils.clamp((thumb.touchPoint.x - rect.left) / rect.width(), 0f, 1f)
+        thumb.yProgress = 1f - MathUtils.clamp((thumb.touchPoint.y - rect.top) / rect.height(), 0f, 1f)
+        thumb.updatePosition(rect)
+
+        onValueChanged(thumbs)
+
+        invalidate()
+        return true
+    }
+
+    fun setMainColor(color: Int) {
+        baseColor = color
+        Color.colorToHSV(color, baseHsv)
+        updateShader()
+        invalidate()
+    }
+
+    fun getThumbColor(i: Int): Int = thumbs[i].let {
+        val hsv = floatArrayOf(baseHsv[0], it.xProgress, it.yProgress)
+        Color.HSVToColor(hsv)
+    }
+    fun setThumbColor(i: Int, color: Int) {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        thumbs[i].xProgress = hsv[1]
+        thumbs[i].yProgress = hsv[2]
+        thumbs[i].updatePosition(drawingRect())
+        invalidate()
+    }
+
+    override fun onSaveInstanceState(): Parcelable {
+        val state = SavedState(super.onSaveInstanceState())
+        state.thumbXs = FloatArray(thumbs.size, { i -> thumbs[i].xProgress })
+        state.thumbYs = FloatArray(thumbs.size, { i -> thumbs[i].yProgress })
+        return state
+    }
+
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        if (state !is SavedState) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+
+        super.onRestoreInstanceState(state.superState)
+
+        state.thumbXs.forEachIndexed { i, v -> thumbs[i].xProgress = v }
+        state.thumbYs.forEachIndexed { i, v -> thumbs[i].yProgress = v }
+        onValueChanged(thumbs)
+        invalidate()
+    }
+
+    class SavedState : BaseSavedState {
+        var thumbXs: FloatArray = FloatArray(0)
+        var thumbYs: FloatArray = FloatArray(0)
+
+        constructor(superState: Parcelable?) : super(superState)
+
+        constructor(source: Parcel) : super(source) {
+            source.readFloatArray(thumbYs)
+            source.readFloatArray(thumbXs)
+        }
+
+        override fun writeToParcel(out: Parcel, flags: Int) {
+            super.writeToParcel(out, flags)
+            out.writeFloatArray(thumbXs)
+            out.writeFloatArray(thumbYs)
+        }
+
+        companion object {
+            @JvmField
+            val CREATOR = object : Parcelable.Creator<SavedState> {
+                override fun createFromParcel(parcel: Parcel): SavedState {
+                    return SavedState(parcel)
+                }
+
+                override fun newArray(size: Int): Array<SavedState?> {
+                    return Array(size) { null }
+                }
+            }
         }
     }
 }

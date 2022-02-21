@@ -13,12 +13,13 @@
     <ListPreference
         app:key="profile_type"
         app:title="Color picker type"
+        app:entries="@array/profile_types_array"
         app:useSimpleSummaryProvider="true" />
 
     <com.mare5x.colorcalendar.ColorBarPreference
         app:key="profile_color_bar"
         app:title="Pick profile colors"
-        app:summary="Tap to open color circle"
+        app:summary="Tap to open color picker"
         app:layout="@layout/preference_colorbar" />
 
     <CheckBoxPreference

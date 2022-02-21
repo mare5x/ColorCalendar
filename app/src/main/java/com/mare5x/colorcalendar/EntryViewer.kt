@@ -40,11 +40,9 @@ class EntryAdapter(
         private val entryText: TextView = v.findViewById(R.id.entryText)
 
         fun bind(entry: Entry) {
-            colorItem.setColor(
-                entry.color
-                    ?: calcGradientColor(profile.minColor, profile.maxColor, entry.value, profile.flags))
+            colorItem.setColor(entry.color ?: calcGradientColor(profile, entry.value))
             entryText.text = entryDateFormat.format(entry.date)
-            itemView.isActivated = entry.flags hasFlag EntryFlag.IS_SELECTED
+            itemView.isActivated = entry == selectedItem
             itemView.setOnClickListener {
                 selectItem(entry)
                 selectionChanged = true
@@ -332,7 +330,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener, 
     ): View? {
         profileType = requireArguments().getSerializable(PROFILE_TYPE) as ProfileType
         return when (profileType) {
-            ProfileType.TWO_COLOR_CIRCLE -> inflater.inflate(R.layout.dialog_entry_editor, container, false)
+            ProfileType.TWO_COLOR_CIRCLE, ProfileType.ONE_COLOR_HSV -> inflater.inflate(R.layout.dialog_entry_editor, container, false)
             ProfileType.FREE_COLOR -> inflater.inflate(R.layout.dialog_entry_editor_free, container, false)
         }
     }
@@ -345,6 +343,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener, 
         val typeFlags = args.getInt(PROFILE_FLAGS)
 
         val colorBar = view.findViewById<ColorButtonBar>(R.id.colorBar)
+        colorBar.setIsLinear(profileType == ProfileType.ONE_COLOR_HSV)
         colorBar.setColors(minColor, maxColor)
         colorBar.setNormProgress(barValue)
         colorBar.setTypeFlags(typeFlags)
@@ -409,7 +408,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener, 
         super.onViewCreated(view, savedInstanceState)
 
         when (profileType) {
-            ProfileType.TWO_COLOR_CIRCLE -> onViewCreatedBar(view, savedInstanceState)
+            ProfileType.TWO_COLOR_CIRCLE, ProfileType.ONE_COLOR_HSV -> onViewCreatedBar(view, savedInstanceState)
             ProfileType.FREE_COLOR -> onViewCreatedCircle(view, savedInstanceState)
         }
 
@@ -479,7 +478,7 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener, 
         const val LOW_COLOR_KEY = "LOW_COLOR"
         const val HIGH_COLOR_KEY = "HIGH_COLOR_KEY"
         const val BAR_VALUE_KEY = "BAR_VALUE"
-        const val PROFILE_FLAGS = "PROFILE_TYPE"
+        const val PROFILE_FLAGS = "PROFILE_FLAGS"
         const val PROFILE_TYPE = "PROFILE_TYPE"
         const val PREFERRED_COLOR = "PREFERRED_COLOR_KEY"
         const val FORCED_BAR_COLOR = "FORCED_BAR_COLOR_KEY"
@@ -487,13 +486,13 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener, 
         fun create(profile: ProfileEntry, closestEntry: Entry? = null): EntryEditorDialog {
             val fragment = EntryEditorDialog()
             when (profile.type) {
-                ProfileType.TWO_COLOR_CIRCLE ->
+                ProfileType.TWO_COLOR_CIRCLE, ProfileType.ONE_COLOR_HSV ->
                     fragment.arguments = Bundle().apply {
                         putInt(LOW_COLOR_KEY, profile.minColor)
                         putInt(HIGH_COLOR_KEY, profile.maxColor)
                         putFloat(BAR_VALUE_KEY,
                             if (closestEntry != null) closestEntry.value
-                            else calcGradientProgress(profile.minColor, profile.maxColor, profile.prefColor, profile.flags))
+                            else calcGradientProgress(profile))
                         if (closestEntry != null && closestEntry.color != null)
                             putInt(FORCED_BAR_COLOR, closestEntry.color!!)
                         putInt(PROFILE_FLAGS, profile.flags)
