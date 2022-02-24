@@ -44,7 +44,7 @@ fun calcDayDifference(d1: Date, d2: Date): Int {
         set(Calendar.HOUR_OF_DAY, 12)
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis
-    return TimeUnit.DAYS.convert(t2 - t1, TimeUnit.MILLISECONDS).toInt()
+    return (TimeUnit.MILLISECONDS.toDays(t2) - TimeUnit.MILLISECONDS.toDays(t1)).toInt()
 }
 
 fun getProfileDayAge(profile: ProfileEntry) = calcDayDifference(profile.creationDate, Date()) + 1
