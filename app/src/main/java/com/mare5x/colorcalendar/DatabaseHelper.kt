@@ -9,6 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.provider.BaseColumns
 import android.util.Log
 import androidx.core.database.getIntOrNull
+import androidx.preference.PreferenceManager
 import java.util.*
 
 
@@ -152,6 +153,29 @@ data class Entry(
     }
 }
 
+// TODO: Maybe the profile order could also be stored in a separate database table.
+// NOTE: The profile order is saved as a string of comma delimited profile ids.
+fun getProfileOrder(context: Context): List<Long> {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+    val orderStr = prefs.getString(SettingsActivity.SETTING_PROFILE_ORDER, null)
+    return orderStr?.split(",")?.map { it.toLong() } ?: emptyList()
+}
+
+fun putProfileOrder(context: Context, order: Collection<Long>) {
+    with (PreferenceManager.getDefaultSharedPreferences(context).edit()) {
+        putString(SettingsActivity.SETTING_PROFILE_ORDER, order.joinToString(separator = ",") {
+            it.toString()
+        })
+        apply()
+    }
+}
+
+fun modifyProfileOrder(context: Context, operation: (order: MutableList<Long>) -> Unit) {
+    val order = getProfileOrder(context).toMutableList()
+    operation(order)
+    putProfileOrder(context, order)
+}
+
 
 fun isValidDatabaseFile(file: String): Boolean {
     return try {
@@ -201,7 +225,9 @@ fun queryAllProfiles(db: SQLiteDatabase): Array<ProfileEntry> {
     val queryStr = """
             SELECT *
             FROM ${profileDB.TABLE_NAME}
+            ORDER BY ${profileDB.ID}
         """.trimIndent()
+    // Ordering by id is the same as ordering by real creation date
 
     val cursor = db.rawQuery(queryStr, null)
     cursor.moveToFirst()
@@ -261,9 +287,15 @@ fun queryClosestEntry(db: SQLiteDatabase, profile: ProfileEntry, date: Date) : E
 
 
 class DatabaseHelper : SQLiteOpenHelper {
-    constructor(ctx : Context) : super(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION)
-    constructor(ctx : Context?, name: String) : super(ctx, name, null, DatabaseContract.DB_VERSION)
+    constructor(ctx : Context) : super(ctx, DatabaseContract.DB_NAME, null, DatabaseContract.DB_VERSION) {
+        context = ctx
+    }
+    constructor(ctx : Context, name: String) : super(ctx, name, null, DatabaseContract.DB_VERSION) {
+        context = ctx
+    }
+
     // TODO execute database commands in a coroutine
+    private val context: Context
 
     override fun onCreate(db: SQLiteDatabase) {
         // "Multiple statements separated by semicolons are not supported."
@@ -314,12 +346,10 @@ class DatabaseHelper : SQLiteOpenHelper {
 
     fun insertProfile(profile: ProfileEntry): Long {
         val profileDB = DatabaseContract.ProfileEntryDB
-        try {
-            return writableDatabase.insertOrThrow(profileDB.TABLE_NAME, null, profile.contentValues())
-        } catch (e: Exception) {
-            Log.e(TAG, "insertProfile: ", e)
-        }
-        return -1
+        val id = writableDatabase.insertOrThrow(profileDB.TABLE_NAME, null, profile.contentValues())
+        // Add profile to end of profile ordering
+        modifyProfileOrder(context) { order -> order.add(id) }
+        return id
     }
 
     fun updateProfile(profile: ProfileEntry): Long {
@@ -329,6 +359,8 @@ class DatabaseHelper : SQLiteOpenHelper {
     }
 
     fun deleteProfile(profile: ProfileEntry) {
+        // NOTE: this could have been enforced by foreign key constraints (on delete cascade)
+        modifyProfileOrder(context) { order -> order.remove(profile.id) }
         writableDatabase.delete(
             DatabaseContract.EntryDB.TABLE_NAME,
             "${DatabaseContract.EntryDB.PROFILE_FK} = ${profile.id}",
@@ -371,7 +403,16 @@ class DatabaseHelper : SQLiteOpenHelper {
     }
 
     fun queryAllProfiles(): Array<ProfileEntry> {
-        return queryAllProfiles(writableDatabase)
+        val profiles = queryAllProfiles(writableDatabase)
+        // Sort by the stored profile ordering
+        val order = getProfileOrder(context)
+        if (order.size == profiles.size) {
+            return Array(profiles.size) { i ->
+                profiles.find { it.id == order[i] }!!
+            }
+        } else {
+            return profiles
+        }
     }
 
     fun queryAllEntries(profile: ProfileEntry) : Array<Entry> {

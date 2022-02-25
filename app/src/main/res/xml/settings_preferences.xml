@@ -16,6 +16,10 @@
         android:defaultValue="true"
         />
 
+    <Preference
+        app:key="profile_order_setting"
+        app:title="Reorder profiles" />
+
     <PreferenceCategory>
 
         <Preference
