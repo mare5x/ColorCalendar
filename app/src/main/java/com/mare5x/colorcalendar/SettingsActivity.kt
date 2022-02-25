@@ -15,6 +15,8 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import com.mare5x.colorcalendar.databinding.SettingsActivityBinding
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 class SettingsViewModel : ViewModel() {
     val changedSettings = mutableSetOf<String>()
@@ -50,10 +52,11 @@ class SettingsActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
             val exportPreference = findPreference<Preference>("export_setting")!!
             exportPreference.setOnPreferenceClickListener {
+                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
                 val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
-                    putExtra(Intent.EXTRA_TITLE, "colorcalendar-backup.db")
+                    putExtra(Intent.EXTRA_TITLE, "colorcalendar_${timestamp}.db")
                 }
                 activity?.startActivityForResult(intent, EXPORT_CODE)
                 true
