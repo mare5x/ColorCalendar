@@ -21,6 +21,7 @@ import java.util.*
 
 typealias ProfileList = MutableList<ProfileEntry>
 
+// TODO don't hold a reference to db because it holds a Context reference
 class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
     private val profilesData = MutableLiveData<ProfileList>()
 
@@ -31,10 +32,8 @@ class ProfilesViewModel(private val db: DatabaseHelper) : ViewModel() {
     fun getProfiles() = profilesData
 
     fun fetchProfiles() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val profiles = db.queryAllProfiles()
-            profilesData.postValue(profiles.toMutableList())
-        }
+        val profiles = db.queryAllProfiles()
+        profilesData.postValue(profiles.toMutableList())
     }
 
     fun getSize(): Int = profilesData.value?.size ?: 0

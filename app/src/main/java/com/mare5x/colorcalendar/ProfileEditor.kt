@@ -769,7 +769,6 @@ class ProfileEditorActivity : AppCompatActivity(),
             }
             R.id.action_confirm_profile -> {
                 confirmProfile()
-                dismiss()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -779,7 +778,6 @@ class ProfileEditorActivity : AppCompatActivity(),
     override fun onBackPressed() {
         if (forceSelection) {
             confirmProfile()
-            dismiss()
         } else {
             attemptDismiss()
         }
@@ -830,6 +828,15 @@ class ProfileEditorActivity : AppCompatActivity(),
             putExtra(PROFILE_EDIT_MSG_KEY, msg)
         }
         setResult(RESULT_OK, intent)
+
+        if (forceSelection) {
+            // If creating the first profile, restart the app (simplest solution...)
+            startActivity(Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            })
+        } else {
+            dismiss()
+        }
     }
 
     private fun updateUIColor() {

@@ -158,7 +158,7 @@ data class Entry(
 fun getProfileOrder(context: Context): List<Long> {
     val prefs = PreferenceManager.getDefaultSharedPreferences(context)
     val orderStr = prefs.getString(SettingsActivity.SETTING_PROFILE_ORDER, null)
-    return orderStr?.split(",")?.map { it.toLong() } ?: emptyList()
+    return if (orderStr.isNullOrEmpty()) emptyList() else orderStr.split(",").map { it.toLong() }
 }
 
 fun putProfileOrder(context: Context, order: Collection<Long>) {

@@ -357,9 +357,10 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun forcePromptNewProfile() {
+        // The profile editor will 'restart' the app...
         val intent = Intent(this, ProfileEditorActivity::class.java)
         intent.putExtra(ProfileEditorActivity.FORCE_SELECTION_KEY, true)
-        startActivityForResult(intent, PROFILE_EDITOR_CODE)
+        startActivity(intent)
     }
 
     override fun onProfileDelete() {
