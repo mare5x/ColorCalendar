@@ -24,4 +24,6 @@
     <string name="import_dialog_title">Confirm import</string>
     <string name="import_name_conflict">Name conflict!</string>
     <string name="profile_edit_date">Select start date.</string>
+
+    <string name="calendar_rows_summary">Number of columns in each calendar row</string>
 </resources>

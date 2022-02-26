@@ -19,6 +19,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
@@ -190,6 +191,11 @@ class SettingsActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     class SettingsFragment : PreferenceFragmentCompat() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.settings_preferences, rootKey)
+
+            val calendarColsPreference = findPreference<ListPreference>("calendar_rows")!!
+            calendarColsPreference.setSummaryProvider {
+                "${getString(R.string.calendar_rows_summary)}: ${(it as ListPreference).entry}"
+            }
 
             val profileOrderPreference = findPreference<Preference>("profile_order_setting")!!
             profileOrderPreference.setOnPreferenceClickListener {

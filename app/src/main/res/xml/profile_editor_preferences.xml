@@ -14,6 +14,7 @@
         app:key="profile_type"
         app:title="Color picker type"
         app:entries="@array/profile_types_array"
+        app:entryValues="@array/profile_types_values_array"
         app:useSimpleSummaryProvider="true" />
 
     <com.mare5x.colorcalendar.ColorBarPreference

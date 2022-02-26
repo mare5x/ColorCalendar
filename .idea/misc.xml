@@ -8,15 +8,16 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/drawable-v21/entry_viewer_item.xml" value="0.1455" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/drawable/entry_viewer_item.xml" value="0.1395" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/activity_main.xml" value="0.13518518518518519" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/activity_profile_editor.xml" value="0.33" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_color_picker.xml" value="0.25" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_entry_editor.xml" value="0.3546875" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_entry_editor_free.xml" value="0.30833333333333335" />
-        <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_entry_viewer.xml" value="0.3546875" />
+        <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_entry_viewer.xml" value="0.33" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_hsv_rect.xml" value="0.33" />
-        <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_profile_order.xml" value="0.35487232933819696" />
+        <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_profile_order.xml" value="0.25" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/dialog_two_color_picker.xml" value="0.25" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/entry_viewer_item.xml" value="0.3546875" />
         <entry key="..\:/Mare5/dev/projects/ColorCalendar/app/src/main/res/layout/preference_color_range.xml" value="0.1675925925925926" />

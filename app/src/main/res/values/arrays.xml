@@ -3,8 +3,13 @@
     <string-array
         name="profile_types_array">
         <item>Color bar from two colors</item>
+        <item>Color bar from a single color</item>
         <item>Choose from all colors</item>
-        <item>Pick from shades of a single color</item>
+    </string-array>
+    <string-array name="profile_types_values_array">
+        <item>TWO_COLOR_CIRCLE</item>
+        <item>ONE_COLOR_HSV</item>
+        <item>FREE_COLOR</item>
     </string-array>
 
     <string-array name="settings_calendar_rows_array">

@@ -621,8 +621,8 @@ class ProfileSettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
+        // NOTE: values must be the same as ProfileType strings
         val profileTypePreference = findPreference<ListPreference>("profile_type")!!
-        profileTypePreference.entryValues = ProfileType.values().map { it.name }.toTypedArray()
 
         viewModel.name.observe(viewLifecycleOwner) { profileName ->
             profileNamePref.summary = profileName

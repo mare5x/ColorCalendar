@@ -227,6 +227,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         if (entriesChanged || adapter.selectionChanged) {
             entriesViewModel.setDayEntries(dayPosition, entries)
             entriesChanged = false
+            adapter.selectionChanged = false
         }
     }
 
@@ -236,6 +237,7 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         if (entriesChanged || adapter.selectionChanged) {
             entriesViewModel.setDayEntries(dayPosition, entries)
             entriesChanged = false
+            adapter.selectionChanged = false
         }
     }
 
