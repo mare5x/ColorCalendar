@@ -7,6 +7,7 @@
         app:entries="@array/settings_calendar_rows_array"
         app:entryValues="@array/settings_calendar_rows_array_values"
         app:defaultValue="-1"
+        app:iconSpaceReserved="false"
         app:useSimpleSummaryProvider="true" />
 
     <CheckBoxPreference
@@ -14,24 +15,29 @@
         app:title="Show badge"
         app:summary="Display an indicator if a date has multiple entries"
         android:defaultValue="true"
+        app:iconSpaceReserved="false"
         />
 
     <Preference
         app:key="profile_order_setting"
         app:title="Reorder profiles"
-        app:summary="Change the profile order"/>
+        app:summary="Change the profile order"
+        app:iconSpaceReserved="false" />
 
-    <PreferenceCategory>
+    <PreferenceCategory
+        app:iconSpaceReserved="false">
 
         <Preference
             app:key="import_setting"
             app:title="Import profiles"
-            app:summary="Import previously exported profile data" />
+            app:summary="Import previously exported profile data"
+            app:iconSpaceReserved="false"/>
 
         <Preference
             app:key="export_setting"
             app:title="Export profiles"
-            app:summary="Save all your profile data to device" />
+            app:summary="Save all your profile data to device"
+            app:iconSpaceReserved="false"/>
 
     </PreferenceCategory>
 

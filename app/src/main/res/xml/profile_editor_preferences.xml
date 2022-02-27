@@ -1,35 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <EditTextPreference
         app:key="profile_name"
-        app:title="Set profile name" />
+        app:title="Set profile name"
+        app:iconSpaceReserved="false"
+        />
 
     <Preference
         app:key="profile_date"
-        app:title="Set start date" />
+        app:title="Set start date"
+        app:iconSpaceReserved="false"
+        />
 
     <ListPreference
         app:key="profile_type"
         app:title="Color picker type"
         app:entries="@array/profile_types_array"
         app:entryValues="@array/profile_types_values_array"
-        app:useSimpleSummaryProvider="true" />
+        app:useSimpleSummaryProvider="true"
+        app:iconSpaceReserved="false"/>
 
     <com.mare5x.colorcalendar.ColorBarPreference
         app:key="profile_color_bar"
         app:title="Pick profile colors"
         app:summary="Tap to open color picker"
-        app:layout="@layout/preference_colorbar" />
+        app:layout="@layout/preference_colorbar"
+        app:iconSpaceReserved="false"/>
 
     <CheckBoxPreference
         app:key="profile_banner_color_flag"
-        app:title="Use custom banner color" />
+        app:title="Use custom banner color"
+        app:iconSpaceReserved="false"/>
 
     <Preference
         app:key="profile_banner_color"
         app:title="Pick banner color"
-        app:dependency="profile_banner_color_flag" />
+        app:dependency="profile_banner_color_flag"
+        app:iconSpaceReserved="false"/>
 
 </PreferenceScreen>
