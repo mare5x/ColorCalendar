@@ -140,6 +140,11 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
         return inflater.inflate(R.layout.dialog_entry_viewer, container, false)
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, 0)  // Necessary for low API versions
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -337,6 +342,11 @@ class EntryEditorDialog : DialogFragment(), TimePickerDialog.OnTimeSetListener, 
             ProfileType.TWO_COLOR_CIRCLE, ProfileType.ONE_COLOR_HSV -> inflater.inflate(R.layout.dialog_entry_editor, container, false)
             ProfileType.FREE_COLOR -> inflater.inflate(R.layout.dialog_entry_editor_free, container, false)
         }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, 0)  // Necessary for low API versions
     }
 
     private fun onViewCreatedBar(view: View, savedInstanceState: Bundle?) {

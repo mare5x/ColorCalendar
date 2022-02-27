@@ -140,6 +140,11 @@ class ImportDialog : DialogFragment() {
         return inflater.inflate(R.layout.dialog_importer, container, false)
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, 0)  // Necessary for low API versions
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         db = DatabaseHelper(requireContext())
 

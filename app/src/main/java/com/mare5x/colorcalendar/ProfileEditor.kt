@@ -169,6 +169,11 @@ class ColorPickerDialogFragment : DialogFragment() {
         return _binding?.root
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, 0)  // Necessary for low API versions
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -271,6 +276,11 @@ class TwoColorPickerFragment : DialogFragment() {
         return _binding?.root
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, 0)  // Necessary for low API versions
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -359,6 +369,11 @@ class HSVRectFragment : DialogFragment() {
     ): View? {
         _binding = DialogHsvRectBinding.inflate(inflater, container, false)
         return _binding?.root
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, 0)  // Necessary for low API versions
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
