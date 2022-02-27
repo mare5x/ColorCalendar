@@ -203,7 +203,9 @@ class EntryViewerDialog : DialogFragment(), EntryEditorDialog.EntryEditorListene
                 entries.removeAt(position)
                 val selectedItem = adapter.selectedItem
                 adapter.notifyItemRemoved(position)
-                if (entry.flags hasFlag EntryFlag.IS_SELECTED) {
+                if (entries.isEmpty()) {
+                    adapter.selectItem(null)
+                } else if (entry.flags hasFlag EntryFlag.IS_SELECTED) {
                     adapter.selectItem(entries.first())
                 }
                 entriesChanged = true
